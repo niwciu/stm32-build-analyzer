@@ -33,7 +33,7 @@
             {
                 "id": "buildAnalyzer",
                 "name": "Build Analyzer",
-                "type": "tree"
+                "type": "webview"
             }
         ]
     }
