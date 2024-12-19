@@ -5,11 +5,18 @@ import * as path from 'path';
 import * as child_process from 'child_process';
 import * as fs from 'fs';
 
+interface Region {
+    name: string,
+    startAddress: string;
+    size: number;
+    sections: Section[];
+}
 
 interface Section {
     name: string;
     startAddress: string;
     size: number;
+    loadAddress: string;
     module: string;
 }
 
@@ -108,16 +115,20 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         const lines = content.split('\n');
         const sections: Section[] = [];
 
-        const sectionRegex = /^\s*(\.\w+)\s+(0x[\da-fA-F]+)\s+(0x[\da-fA-F]+)\s+(.*)$/;
+        const sectionRegex = /^\s*(\.\w+)\s+(0x[\da-fA-F]+)\s+(0x[\da-fA-F]+)(?:\s+load address\s+(0x[\da-fA-F]+))?\s+(.*)$/;
 
         for (const line of lines) {
             const match = sectionRegex.exec(line);
             if (match) {
-                const [, name, startAddress, sizeHex, module] = match;
+                const [, name, startAddress, sizeHex, loadAddress, module] = match;
+                if(startAddress === "0x00000000" || parseInt(sizeHex, 16) === 0) {
+                    continue;
+                }
                 sections.push({
                     name,
                     startAddress,
                     size: parseInt(sizeHex, 16),
+                    loadAddress,
                     module: module.trim(),
                 });
             }
@@ -145,6 +156,41 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Build Analyzer</title>
+            <style>
+            table.gray {
+                background-color: var(--vscode-editor-background);
+                foreground-color: var(--vscode-editor-foreground);
+                font-family: var(--vscode-editor-font-family, Arial, sans-serif);
+                width: 100%;
+                text-align: left;
+                border-collapse: collapse;
+                }
+                table.gray td, table.gray th {
+                border: 1px solid var(--highlight-color);
+                padding: 3px 2px;
+                }
+                table.gray tbody td {
+                font-size: 13px;
+                }
+                table.gray thead {
+                background: var(--highlight-color);
+                border-bottom: 2px solid var(--highlight-color);
+                }
+                table.gray thead th {
+                font-size: 15px;
+                font-weight: bold;
+                border-left: 2px solid var(--highlight-color);
+                }
+                table.gray thead th:first-child {
+                border-left: none;
+                }
+                table.gray tfoot td {
+                font-size: 14px;
+                }
+                table.gray tfoot .links {
+                text-align: right;
+                }
+        </style>
         </head>
         <body>
             <h1>Добро пожаловать в Build Analyzer!</h1>
@@ -164,6 +210,11 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 					vscode.postMessage({ command: 'parseMapFile' });
 				});
 
+                window.addEventListener('DOMContentLoaded', () => {
+                    console.log('Webview opened, sending message to extension...');
+					vscode.postMessage({ command: 'parseMapFile' });
+                });
+
 				// Обработчик сообщений от основного процесса
 				window.addEventListener('message', (event) => {
 					const message = event.data;
@@ -174,13 +225,15 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 					} else if (message.command === 'showMapData') {
                         document.getElementById('output').textContent = 'i75rytfgvliuohl';
                         const output = document.getElementById('output');
-                        output.innerHTML = '<tr><th>Section</th><th>Address</th><th>Size</th><th>Module</th></tr>' +
+                            output.innerHTML = '<table class="gray"><thead><tr><th>Section</th><th>Address</th><th>Size</th><th>LoadAddress</th><th>Module</th></tr></thead><tbody>' +
                             message.data.map(section => \`<tr>
                                 <td>\${section.name}</td>
                                 <td>\${section.startAddress}</td>
                                 <td>\${section.size}</td>
+                                <td>\${section.loadAddress}</td>
                                 <td>\${section.module}</td>
-                             </tr>\`).join('');
+                             </tr>\`).join('') +
+                             '</tbody></table>';
                     }
 				});
 			</script>
