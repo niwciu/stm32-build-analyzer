@@ -214,12 +214,28 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                     height: 100%;
                     display: inline-block;
                 } 
-                
+                .node {
+                    margin-left: 20px;
+                }
+                .toggleRow {
+                    display: flex;
+                    align-items: center;
+                    cursor: pointer;
+                    user-select: none;
+                }
+                .toggle {
+                    cursor: pointer;
+                    display: inline-block;
+                    width: 20px;
+                    user-select: none;
+                }
+                .children.hidden {
+                    display: none;
+                }
         </style>
         </head>
         <body>
-			<pre id="output"></pre>
-			<pre id="regions"></pre>
+			<pre id="regions" class="tree"></pre>
 			<script>
                 const vscode = acquireVsCodeApi();
                 window.addEventListener('DOMContentLoaded', () => {
@@ -230,16 +246,6 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 					const message = event.data;
 					if (message.command === 'showMapData') {
                         displayRegions(message.data);
-                        const output = document.getElementById('output');
-                            output.innerHTML = '<table class="gray"><thead><tr><th>Section</th><th>Address</th><th>Size</th><th>LoadAddress</th><th></th></tr></thead><tbody>' +
-                            message.data.map(region => \`<tr>
-                                <td>\${region.name}</td>
-                                <td>\${region.startAddress}</td>
-                                <td>\${region.size}</td>
-                                <td>\${region.loadAddress}</td>
-                                <td>\${region.module}</td>
-                             </tr>\`).join('') +
-                             '</tbody></table>';
                     }
 				});
                 function displayRegions(regions) {
@@ -248,10 +254,10 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
                     regions.forEach(region => {
                         const regionDiv = document.createElement('div');
-                        regionDiv.className = 'region';
+                        regionDiv.className = 'node';
 
                         const header = document.createElement('div');
-                        header.className = 'region-header';
+                        header.className = 'toggleRow';
                         const percent = region.used / region.size * 100;
                     
                         const bar = document.createElement('div');
@@ -266,15 +272,20 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                         }
                         progress.textContent = \`\${percent.toFixed(2)}%\`;
                         bar.appendChild(progress);
+                        const plus = document.createElement('span');
+                        plus.className = 'toggle';
+                        plus.textContent = \`+\`;
+                        header.appendChild(plus);
                         header.appendChild(bar);
                         const textNode = document.createTextNode(\` \${region.name} (0x\${region.startAddress.toString(16)}): Used \${region.used} / \${region.size} bytes \`);
                         
-                        header.appendChild(textNode);
+                        header.appendChild(textNode);                    
 
                         const sectionsList = document.createElement('div');
+                        sectionsList.className = 'children hidden';
                         region.sections.forEach(section => {
                             const sectionDiv = document.createElement('div');
-                            sectionDiv.className = 'section';
+                            sectionDiv.className = 'node';
                             sectionDiv.textContent = \`\${section.name} - Address: 0x\${section.startAddress.toString(16)}, Size: \${section.size} bytes\`;
                             sectionsList.appendChild(sectionDiv);
                         });
@@ -285,6 +296,32 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
                     });
                 }
+                document.addEventListener("DOMContentLoaded", () => {
+                    const regionsContainer = document.getElementById("regions");
+
+                    regionsContainer.addEventListener("click", (e) => {
+                        const toggle = e.target.closest(".toggle");
+                        if (toggle) {
+                            toggleNode(toggle);
+                        }
+                    });
+
+                    regionsContainer.addEventListener("dblclick", (e) => {
+                        const toggleRow = e.target.closest(".toggleRow");
+                        if (toggleRow) {
+                            const toggle = toggleRow.querySelector(".toggle");
+                            if (toggle) toggleNode(toggle);
+                        }
+                    });
+
+                    function toggleNode(toggleElement) {
+                        const children = toggleElement.closest(".node").querySelector(".children");
+                        if (children) {
+                            children.classList.toggle("hidden");
+                            toggleElement.textContent = children.classList.contains("hidden") ? "+" : "-";
+                        }
+                    }
+                });
 			</script>
         </body>
         </html>
