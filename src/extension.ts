@@ -7,16 +7,17 @@ import * as fs from 'fs';
 
 interface Region {
     name: string,
-    startAddress: string;
+    startAddress: number;
     size: number;
+    used: number;
     sections: Section[];
 }
 
 interface Section {
     name: string;
-    startAddress: string;
+    startAddress: number;
     size: number;
-    loadAddress: string;
+    loadAddress: number;
     module: string;
 }
 
@@ -32,33 +33,18 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 		this._view = webviewView;
 
         webviewView.webview.options = {
-            enableScripts: true, // Разрешаем выполнение скриптов
-            
+            enableScripts: true,
         };
 
 		const projectPath = vscode.workspace.workspaceFolders?.[0].uri.fsPath || '';
-        const elfFilePath = this.findElfFile(projectPath);
         const mapFilePath = this.findMapFile(projectPath);
 
-        // Устанавливаем HTML-контент для Webview
-        webviewView.webview.html = this.getHtmlContent(webviewView.webview, elfFilePath);
+        webviewView.webview.html = this.getHtmlContent(webviewView.webview, "");
 
         webviewView.webview.onDidReceiveMessage(
             message => {
                 console.log('Received message:', message);
                 switch (message.command) {
-                    case 'runObjdump':
-                        this.runObjdumpCommand(elfFilePath)
-                            .then(output => {
-                                // Отправляем результат обратно в Webview
-                                console.log(`showOutput showOutput showOutput showOutput showOutput `);
-                                webviewView.webview.postMessage({ command: 'showOutput', output: output });
-                            })
-                            .catch(error => {
-                                console.log(`showError showError showError showError showError showError `);
-                                webviewView.webview.postMessage({ command: 'showError', error: error });
-                            });
-                        return;
                     case 'parseMapFile':
                         const sections = this.parseMapFile(mapFilePath);
                         webviewView.webview.postMessage({ command: 'showMapData', data: sections });
@@ -68,18 +54,6 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
             undefined,
             this._context.subscriptions
         );
-    }
-	
-	private findElfFile(projectPath: string): string {
-        const buildDir = path.join(projectPath, 'build', 'Debug');
-        if (fs.existsSync(buildDir)) {
-            const files = fs.readdirSync(buildDir);
-            const elfFile = files.find(file => file.endsWith('.elf')); 
-            if (elfFile) {
-                return path.join(buildDir, elfFile); 
-            }
-        }
-        return ``;
     }
 	
 	private findMapFile(projectPath: string): string {
@@ -93,60 +67,104 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         }
         return ``;
     }
-	
-	private runObjdumpCommand(elfPath: string): Promise<string> {
-		return new Promise((resolve, reject) => {
-            console.log('Running objdump command...');
-			child_process.exec(`arm-none-eabi-objdump -h ${elfPath}`, (error, stdout, stderr) => {
-				if (error) {
-                    console.error('Error executing objdump:', stderr);
-					reject(`Ошибка: ${stderr}`);
-				} else {
-                    console.log('Command output:', stdout); 
-					resolve(stdout);
-				}
-			});
-		});
-	}
-
-    
-    private parseMapFile(mapFilePath: string): Section[] {
+	    
+    private parseMapFile(mapFilePath: string): Region[] {
         const content = fs.readFileSync(mapFilePath, 'utf8');
         const lines = content.split('\n');
         const sections: Section[] = [];
 
-        const sectionRegex = /^\s*(\.\w+)\s+(0x[\da-fA-F]+)\s+(0x[\da-fA-F]+)(?:\s+load address\s+(0x[\da-fA-F]+))?\s+(.*)$/;
+        const regions:Region[] = [];
+
+        const regionRegex = /^\s*(\w+)\s+(0x[\da-fA-F]+)\s+(0x[\da-fA-F]+)\s+\w+/;
+        const sectionFullRegex = /^\s*(\.\w+)\s+(0x[\da-fA-F]+)\s+(0x[\da-fA-F]+)(?:\s+load address\s+(0x[\da-fA-F]+))?\s+(.*)$/;
+        const sectionNameRegex = /^\s*(\.\w+)/;
+        const sectionDataRegex = /^\s+(0x[\da-fA-F]+)\s+(0x[\da-fA-F]+)(?:\s+load address\s+(0x[\da-fA-F]+))?\s+(.*)$/;
+
+        let isRegion = false;
+        let isSection = false;
+
+        let combinedStr: string | null = null;
 
         for (const line of lines) {
-            const match = sectionRegex.exec(line);
-            if (match) {
-                const [, name, startAddress, sizeHex, loadAddress, module] = match;
-                if(startAddress === "0x00000000" || parseInt(sizeHex, 16) === 0) {
+            if (line.startsWith('Memory Configuration')) {
+                isRegion = true;
+                isSection = false;
+                continue;
+            }
+            if (line.startsWith('Linker script and memory map')) {
+                isRegion = false;
+                isSection = true;
+                continue;
+            }
+            
+            if(isRegion) {
+                const match = regionRegex.exec(line);
+                if(match) {
+                    const [, name, startAddress, length] = match;
+                    regions.push({
+                        name,
+                        startAddress: parseInt(startAddress, 16),
+                        size: parseInt(length, 16),
+                        used: 0,
+                        sections: [],
+                    });
+                }
+            }
+
+            if(isSection) {
+                const nameMatch = sectionNameRegex.exec(line);
+                if(nameMatch) {
+                    combinedStr = line;
                     continue;
                 }
-                sections.push({
-                    name,
-                    startAddress,
-                    size: parseInt(sizeHex, 16),
-                    loadAddress,
-                    module: module.trim(),
-                });
+
+                const dataMatch = sectionDataRegex.exec(line);
+                if(combinedStr && dataMatch) {
+                    combinedStr += ' ' + line.trim();
+                }
+                
+                const match = sectionFullRegex.exec(combinedStr?combinedStr:line);
+                if(match) {
+                    const [, name, startAddress, sizeHex, loadAddress, module] = match;
+                    const sectionStart = parseInt(startAddress, 16);
+                    const sectionSize = parseInt(sizeHex, 16);
+                    const sectionLoadStart = parseInt(loadAddress, 16);
+                    if(sectionStart === 0 || sectionSize === 0) {
+                        continue;
+                    }
+                    for(const region of regions) {
+                        const regionStart = region.startAddress;
+                        const regionEnd = regionStart + region.size;
+                        if(sectionStart >= regionStart && sectionStart < regionEnd) {
+                            region.sections.push({
+                                name,
+                                startAddress: sectionStart,
+                                size: sectionSize,
+                                loadAddress: sectionLoadStart,
+                                module,
+                            });
+                            region.used += sectionSize;
+                            continue;
+                        }
+                        if(sectionLoadStart >= regionStart && sectionLoadStart < regionEnd) {
+                            region.sections.push({
+                                name,
+                                startAddress: sectionStart,
+                                size: sectionSize,
+                                loadAddress: sectionLoadStart,
+                                module,
+                            });
+                            region.used += sectionSize;
+                        }
+                    }
+                }
+                combinedStr = null;
             }
+
+            
         }
-        return sections;
+        return regions;
     }
-
-	private analyzeElfFile(elfPath: string): string {
-		const output = ``;
-		
-		const sections = output.split('\n').filter(line => line.includes('.'));
-		const formatted = sections.map(line => {
-			const parts = line.trim().split(/\s+/);
-			return `Секция: ${parts[1]}, Адрес: ${parts[3]}, Размер: ${parseInt(parts[2], 16)} байт`;
-		});
-
-		return formatted.join('\n');
-	}
 
     private getHtmlContent(webview: vscode.Webview, elfFilePath: string|null): string {
         return `
@@ -190,52 +208,83 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                 table.gray tfoot .links {
                 text-align: right;
                 }
+                .bar { 
+                    background-color: var(--vscode-editorWidget-border); 
+                    width: 100px; 
+                    height: 100%;
+                    display: inline-block;
+                } 
+                
         </style>
         </head>
         <body>
-            <h1>Добро пожаловать в Build Analyzer!</h1>
-            <p>Это пример сложного HTML в Webview.</p>
-            <div class="build-results">
-                <p>Путь до файла: ${elfFilePath ? elfFilePath : 'Файл .elf не найден'}</p>
-            </div>
-			
-			<button id="runCommand">Run objdump</button>
 			<pre id="output"></pre>
-
+			<pre id="regions"></pre>
 			<script>
                 const vscode = acquireVsCodeApi();
-				document.getElementById('runCommand').addEventListener('click', () => {
-					// Отправляем сообщение в основной процесс
-                    console.log('Button clicked, sending message to extension...');
-					vscode.postMessage({ command: 'parseMapFile' });
-				});
-
                 window.addEventListener('DOMContentLoaded', () => {
                     console.log('Webview opened, sending message to extension...');
 					vscode.postMessage({ command: 'parseMapFile' });
                 });
-
-				// Обработчик сообщений от основного процесса
 				window.addEventListener('message', (event) => {
 					const message = event.data;
-					if (message.command === 'showOutput') {
-						document.getElementById('output').textContent = message.output;
-					} else if (message.command === 'showError') {
-						document.getElementById('output').textContent = message.error;
-					} else if (message.command === 'showMapData') {
-                        document.getElementById('output').textContent = 'i75rytfgvliuohl';
+					if (message.command === 'showMapData') {
+                        displayRegions(message.data);
                         const output = document.getElementById('output');
-                            output.innerHTML = '<table class="gray"><thead><tr><th>Section</th><th>Address</th><th>Size</th><th>LoadAddress</th><th>Module</th></tr></thead><tbody>' +
-                            message.data.map(section => \`<tr>
-                                <td>\${section.name}</td>
-                                <td>\${section.startAddress}</td>
-                                <td>\${section.size}</td>
-                                <td>\${section.loadAddress}</td>
-                                <td>\${section.module}</td>
+                            output.innerHTML = '<table class="gray"><thead><tr><th>Section</th><th>Address</th><th>Size</th><th>LoadAddress</th><th></th></tr></thead><tbody>' +
+                            message.data.map(region => \`<tr>
+                                <td>\${region.name}</td>
+                                <td>\${region.startAddress}</td>
+                                <td>\${region.size}</td>
+                                <td>\${region.loadAddress}</td>
+                                <td>\${region.module}</td>
                              </tr>\`).join('') +
                              '</tbody></table>';
                     }
 				});
+                function displayRegions(regions) {
+                    const regionsContainer = document.getElementById('regions');
+                    regionsContainer.innerHTML = ''; // Очистить контейнер
+
+                    regions.forEach(region => {
+                        const regionDiv = document.createElement('div');
+                        regionDiv.className = 'region';
+
+                        const header = document.createElement('div');
+                        header.className = 'region-header';
+                        const percent = region.used / region.size * 100;
+                    
+                        const bar = document.createElement('div');
+                        bar.className = 'bar';
+                        const progress = document.createElement('div');
+                        if(percent > 95) {
+                            progress.setAttribute('style', \`width: \${percent}%; background-color: var(--vscode-minimap-errorHighlight); height: 100%;\`);
+                        } else if(percent > 75) {
+                            progress.setAttribute('style', \`width: \${percent}%; background-color: var(--vscode-minimap-warningHighlight); height: 100%;\`);
+                        } else {
+                            progress.setAttribute('style', \`width: \${percent}%; background-color: var(--vscode-minimap-infoHighlight); height: 100%;\`);
+                        }
+                        progress.textContent = \`\${percent.toFixed(2)}%\`;
+                        bar.appendChild(progress);
+                        header.appendChild(bar);
+                        const textNode = document.createTextNode(\` \${region.name} (0x\${region.startAddress.toString(16)}): Used \${region.used} / \${region.size} bytes \`);
+                        
+                        header.appendChild(textNode);
+
+                        const sectionsList = document.createElement('div');
+                        region.sections.forEach(section => {
+                            const sectionDiv = document.createElement('div');
+                            sectionDiv.className = 'section';
+                            sectionDiv.textContent = \`\${section.name} - Address: 0x\${section.startAddress.toString(16)}, Size: \${section.size} bytes\`;
+                            sectionsList.appendChild(sectionDiv);
+                        });
+
+                        regionDiv.appendChild(header);
+                        regionDiv.appendChild(sectionsList);
+                        regionsContainer.appendChild(regionDiv);
+
+                    });
+                }
 			</script>
         </body>
         </html>
