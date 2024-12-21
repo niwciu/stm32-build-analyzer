@@ -18,7 +18,13 @@ interface Section {
     startAddress: number;
     size: number;
     loadAddress: number;
-    module: string;
+    symbols: Symbol[];
+}
+
+interface Symbol {
+    name: string;
+    startAddress: number;
+    size: number;
 }
 
 class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
@@ -76,14 +82,25 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         const regions:Region[] = [];
 
         const regionRegex = /^\s*(\w+)\s+(0x[\da-fA-F]+)\s+(0x[\da-fA-F]+)\s+\w+/;
-        const sectionFullRegex = /^\s*(\.\w+)\s+(0x[\da-fA-F]+)\s+(0x[\da-fA-F]+)(?:\s+load address\s+(0x[\da-fA-F]+))?\s+(.*)$/;
-        const sectionNameRegex = /^\s*(\.\w+)/;
+        const sectionFullRegex = /^([a-zA-Z0-9._]+)\s+(0x[\da-fA-F]+)\s+(0x[\da-fA-F]+)(?:\s+load address\s+(0x[\da-fA-F]+))?\s+(.*)$/;
+        const sectionNameRegex = /^([a-zA-Z0-9._]+)/;
         const sectionDataRegex = /^\s+(0x[\da-fA-F]+)\s+(0x[\da-fA-F]+)(?:\s+load address\s+(0x[\da-fA-F]+))?\s+(.*)$/;
+
+        const subSectionFullRegex = /^\s([a-zA-Z0-9._]+)\s+(0x[0-9a-fA-F]+)\s+(0x[0-9a-fA-F]+)\s+(.*)[\r\n]/;
+        const subSectionNameRegex = /^\s([a-zA-Z0-9._]+)\s+[\r\n]/;
+        const subSectionDataRegex = /^\s+(0x[0-9a-fA-F]+)\s+(0x[0-9a-fA-F]+)\s+(.*)[\r\n]/;
+
+        const symbolsRegex = /^\s+(0x[0-9a-fA-F]+)\s+([a-zA-Z0-9._]+)[\r\n]/;
 
         let isRegion = false;
         let isSection = false;
 
         let combinedStr: string | null = null;
+
+        let actualSectionName: string = "";
+        let actualSectionStartAddress: number = 0;
+        let actualSectionSize: number = 0;
+        let symbols: Symbol[] = [];
 
         for (const line of lines) {
             if (line.startsWith('Memory Configuration')) {
@@ -123,9 +140,9 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                     combinedStr += ' ' + line.trim();
                 }
                 
-                const match = sectionFullRegex.exec(combinedStr?combinedStr:line);
+                let match = sectionFullRegex.exec(combinedStr?combinedStr:line);
                 if(match) {
-                    const [, name, startAddress, sizeHex, loadAddress, module] = match;
+                    const [, name, startAddress, sizeHex, loadAddress, ] = match;
                     const sectionStart = parseInt(startAddress, 16);
                     const sectionSize = parseInt(sizeHex, 16);
                     const sectionLoadStart = parseInt(loadAddress, 16);
@@ -141,7 +158,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                                 startAddress: sectionStart,
                                 size: sectionSize,
                                 loadAddress: sectionLoadStart,
-                                module,
+                                symbols: []
                             });
                             region.used += sectionSize;
                             continue;
@@ -149,15 +166,80 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                         if(sectionLoadStart >= regionStart && sectionLoadStart < regionEnd && name === '.data') {
                             region.sections.push({
                                 name,
-                                startAddress: sectionLoadStart,
+                                startAddress: sectionStart,
                                 size: sectionSize,
                                 loadAddress: sectionLoadStart,
-                                module,
+                                symbols: []
                             });
                             region.used += sectionSize;
                         }
                     }
                 }
+
+                match = subSectionFullRegex.exec(line);
+                if(!match) {
+                    const symbolNameMatch = subSectionNameRegex.exec(line);
+                    if(symbolNameMatch) {
+                        combinedStr = line;
+                        continue;
+                    }
+    
+                    const symbolDataMatch = subSectionDataRegex.exec(line);
+                    if(combinedStr && symbolDataMatch) {
+                        combinedStr += ' ' + line.trim();
+                    }
+
+                    match = subSectionFullRegex.exec(combinedStr?combinedStr:line);
+                }
+
+                if(match) {
+                    const [, name, startAddress, sizeHex, ] = match;
+                    const subSectionStart = parseInt(startAddress, 16);
+                    const subSectionSize = parseInt(sizeHex, 16);
+                    if(symbols.length > 0) {
+                        const lastSym = symbols.at(-1)!;
+                        lastSym.size = actualSectionStartAddress + actualSectionSize - lastSym.startAddress;
+                    } else {
+                        symbols.push({
+                            name: actualSectionName,
+                            startAddress: actualSectionStartAddress,
+                            size: actualSectionSize
+                        });
+                    }
+                    for(const region of regions) {
+                        for(const section of region.sections) {
+                            if(subSectionStart >= section.startAddress && subSectionStart < section.startAddress+section.size) {
+                                for(const symbol of symbols) {
+                                    section.symbols.push({
+                                        name: symbol.name,
+                                        startAddress: symbol.startAddress,
+                                        size: symbol.size
+                                    });
+                                }
+                                symbols = [];
+                            }
+                        }
+                    }
+                    actualSectionName = name;
+                    actualSectionStartAddress = subSectionStart;
+                    actualSectionSize = subSectionSize;
+                }
+                
+                match = symbolsRegex.exec(line);
+                if(match) {
+                    const [, startAddress, name, ] = match;
+                    const symbolStart = parseInt(startAddress, 16);
+                    symbols.push({
+                        name,
+                        startAddress: symbolStart,
+                        size: 0
+                    });
+                    if(symbols.length > 1) {
+                        symbols.at(-2)!.size = symbols.at(-1)!.startAddress - symbols.at(-2)!.startAddress;
+                    }
+                }
+
+
                 combinedStr = null;
             }
 
@@ -434,7 +516,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                             sectionTr.appendChild(sectionTd5);
 
                             tableBody.appendChild(sectionTr);
-                            for(i = 0; i < 4; i++) {
+                            section.symbols.forEach(symbol => {
                                 id++;
                                 pointId = id;
                                 const pointTr = document.createElement('tr');
@@ -447,11 +529,19 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                                 const pointTd1 = document.createElement('td');
                                 const pointTd2 = document.createElement('td');
 
-                                const pointName = document.createTextNode(\` point \`);
+                                const pointName = document.createTextNode(\` \${symbol.name} \`);
                                 pointTd2.appendChild(pointName); 
 
                                 const pointTd3 = document.createElement('td');
+
+                                const pointAddress = document.createTextNode(\` 0x\${symbol.startAddress.toString(16).padStart(8,'0')} \`);
+                                pointTd3.appendChild(pointAddress); 
+
                                 const pointTd4 = document.createElement('td');
+
+                                const pointSize = document.createTextNode(\` \${formatBytes(symbol.size)} \`);
+                                pointTd4.appendChild(pointSize); 
+
                                 const pointTd5 = document.createElement('td');
 
                                 pointTr.appendChild(pointTd1);
@@ -461,7 +551,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                                 pointTr.appendChild(pointTd5);
 
                                 tableBody.appendChild(pointTr);
-                            }
+                            });
                         });
                     });
                 }
