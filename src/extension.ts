@@ -87,7 +87,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         const sectionDataRegex = /^\s+(0x[\da-fA-F]+)\s+(0x[\da-fA-F]+)(?:\s+load address\s+(0x[\da-fA-F]+))?\s+(.*)$/;
 
         const subSectionFullRegex = /^\s([a-zA-Z0-9._]+)\s+(0x[0-9a-fA-F]+)\s+(0x[0-9a-fA-F]+)\s+(.*)[\r\n]/;
-        const subSectionNameRegex = /^\s([a-zA-Z0-9._]+)\s+[\r\n]/;
+        const subSectionNameRegex = /^\s([a-zA-Z0-9._]+)[\r\n]/;
         const subSectionDataRegex = /^\s+(0x[0-9a-fA-F]+)\s+(0x[0-9a-fA-F]+)\s+(.*)[\r\n]/;
 
         const symbolsRegex = /^\s+(0x[0-9a-fA-F]+)\s+([a-zA-Z0-9._]+)[\r\n]/;
@@ -102,7 +102,11 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         let actualSectionSize: number = 0;
         let symbols: Symbol[] = [];
 
+        let lastLine: string = "";
         for (const line of lines) {
+            if(lastLine === line) {
+                continue;
+            }
             if (line.startsWith('Memory Configuration')) {
                 isRegion = true;
                 isSection = false;
@@ -129,18 +133,23 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
             }
 
             if(isSection) {
-                const nameMatch = sectionNameRegex.exec(line);
-                if(nameMatch) {
-                    combinedStr = line;
-                    continue;
-                }
+                
+                let match = sectionFullRegex.exec(line);
+                if(!match) {
+                    const nameMatch = sectionNameRegex.exec(line);
+                    if(nameMatch) {
+                        combinedStr = line.trim();
+                        continue;
+                    }
 
-                const dataMatch = sectionDataRegex.exec(line);
-                if(combinedStr && dataMatch) {
-                    combinedStr += ' ' + line.trim();
+                    const dataMatch = sectionDataRegex.exec(line);
+                    if(combinedStr && dataMatch) {
+                        combinedStr += ' ' + line;
+                    }
+                    
+                    match = sectionFullRegex.exec(combinedStr?combinedStr:line);
                 }
                 
-                let match = sectionFullRegex.exec(combinedStr?combinedStr:line);
                 if(match) {
                     const [, name, startAddress, sizeHex, loadAddress, ] = match;
                     const sectionStart = parseInt(startAddress, 16);
@@ -148,6 +157,33 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                     const sectionLoadStart = parseInt(loadAddress, 16);
                     if(sectionStart === 0 || sectionSize === 0) {
                         continue;
+                    }
+                    if(actualSectionSize > 0) {
+                        if(symbols.length > 0) {
+                            const lastSym = symbols.at(-1)!;
+                            lastSym.size = actualSectionStartAddress + actualSectionSize - lastSym.startAddress;
+                        } else {
+                            symbols.push({
+                                name: actualSectionName,
+                                startAddress: actualSectionStartAddress,
+                                size: actualSectionSize
+                            });
+                        }
+                        for(const region of regions) {
+                            for(const section of region.sections) {
+                                if(actualSectionStartAddress >= section.startAddress && actualSectionStartAddress < section.startAddress+section.size) {
+                                    for(const symbol of symbols) {
+                                        section.symbols.push({
+                                            name: symbol.name,
+                                            startAddress: symbol.startAddress,
+                                            size: symbol.size
+                                        });
+                                    }
+                                    symbols = [];
+                                }
+                            }
+                        }
+                        actualSectionSize = 0;
                     }
                     for(const region of regions) {
                         const regionStart = region.startAddress;
@@ -180,13 +216,13 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                 if(!match) {
                     const symbolNameMatch = subSectionNameRegex.exec(line);
                     if(symbolNameMatch) {
-                        combinedStr = line;
+                        combinedStr = ' ' + line.trim();
                         continue;
                     }
     
                     const symbolDataMatch = subSectionDataRegex.exec(line);
                     if(combinedStr && symbolDataMatch) {
-                        combinedStr += ' ' + line.trim();
+                        combinedStr += ' ' + line;
                     }
 
                     match = subSectionFullRegex.exec(combinedStr?combinedStr:line);
@@ -196,29 +232,32 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                     const [, name, startAddress, sizeHex, ] = match;
                     const subSectionStart = parseInt(startAddress, 16);
                     const subSectionSize = parseInt(sizeHex, 16);
-                    if(symbols.length > 0) {
-                        const lastSym = symbols.at(-1)!;
-                        lastSym.size = actualSectionStartAddress + actualSectionSize - lastSym.startAddress;
-                    } else {
-                        symbols.push({
-                            name: actualSectionName,
-                            startAddress: actualSectionStartAddress,
-                            size: actualSectionSize
-                        });
-                    }
-                    for(const region of regions) {
-                        for(const section of region.sections) {
-                            if(subSectionStart >= section.startAddress && subSectionStart < section.startAddress+section.size) {
-                                for(const symbol of symbols) {
-                                    section.symbols.push({
-                                        name: symbol.name,
-                                        startAddress: symbol.startAddress,
-                                        size: symbol.size
-                                    });
+                    if(actualSectionSize > 0) {
+                        if(symbols.length > 0) {
+                            const lastSym = symbols.at(-1)!;
+                            lastSym.size = actualSectionStartAddress + actualSectionSize - lastSym.startAddress;
+                        } else {
+                            symbols.push({
+                                name: actualSectionName,
+                                startAddress: actualSectionStartAddress,
+                                size: actualSectionSize
+                            });
+                        }
+                        for(const region of regions) {
+                            for(const section of region.sections) {
+                                if(actualSectionStartAddress >= section.startAddress && actualSectionStartAddress < section.startAddress+section.size) {
+                                    for(const symbol of symbols) {
+                                        section.symbols.push({
+                                            name: symbol.name,
+                                            startAddress: symbol.startAddress,
+                                            size: symbol.size
+                                        });
+                                    }
+                                    symbols = [];
                                 }
-                                symbols = [];
                             }
                         }
+                        actualSectionSize = 0;
                     }
                     actualSectionName = name;
                     actualSectionStartAddress = subSectionStart;
@@ -234,16 +273,13 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                         startAddress: symbolStart,
                         size: 0
                     });
-                    if(symbols.length > 1) {
-                        symbols.at(-2)!.size = symbols.at(-1)!.startAddress - symbols.at(-2)!.startAddress;
-                    }
                 }
 
 
                 combinedStr = null;
             }
 
-            
+            lastLine = line;
         }
         return regions;
     }
@@ -337,78 +373,25 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
             <tbody id="regionsBody">
             </tbody>
         </table>
-			<pre id="regions" class="tree"></pre>
 			<script>
                 const vscode = acquireVsCodeApi();
                 window.addEventListener('DOMContentLoaded', () => {
-                    console.log('Webview opened, sending message to extension...');
 					vscode.postMessage({ command: 'parseMapFile' });
                 });
 				window.addEventListener('message', (event) => {
 					const message = event.data;
 					if (message.command === 'showMapData') {
-                        displayRegions(message.data);
                         fillTableRegions(message.data);
                     }
 				});
 
                 function formatBytes(bytes, decimals = 2) {
-                    if (bytes === 0) return '0 Bytes';
+                    if (bytes === 0) return '0 B';
                     const k = 1024;
-                    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+                    const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
                     const i = Math.floor(Math.log(bytes) / Math.log(k));
                     const value = parseFloat((bytes / Math.pow(k, i)).toFixed(decimals));
                     return \`\${value} \${sizes[i]}\`;
-                }
-
-                function displayRegions(regions) {
-                    const regionsContainer = document.getElementById('regions');
-                    regionsContainer.innerHTML = ''; // Очистить контейнер
-
-                    regions.forEach(region => {
-                        const regionDiv = document.createElement('div');
-                        regionDiv.className = 'node';
-
-                        const header = document.createElement('div');
-                        header.className = 'toggleRow';
-
-                        const percent = region.used / region.size * 100;
-                    
-                        const bar = document.createElement('div');
-                        bar.className = 'bar';
-                        const progress = document.createElement('div');
-                        if(percent > 95) {
-                            progress.setAttribute('style', \`width: \${percent}%; background-color: var(--vscode-minimap-errorHighlight); height: 100%;\`);
-                        } else if(percent > 75) {
-                            progress.setAttribute('style', \`width: \${percent}%; background-color: var(--vscode-minimap-warningHighlight); height: 100%;\`);
-                        } else {
-                            progress.setAttribute('style', \`width: \${percent}%; background-color: var(--vscode-minimap-infoHighlight); height: 100%;\`);
-                        }
-                        progress.textContent = \`\${percent.toFixed(2)}%\`;
-                        bar.appendChild(progress);
-                        const plus = document.createElement('span');
-                        plus.className = 'toggle';
-                        plus.textContent = \`+\`;
-                        header.appendChild(plus);
-                        header.appendChild(bar);
-                        const textNode = document.createTextNode(\` \${region.name} (0x\${region.startAddress.toString(16)}): Used \${region.used} / \${region.size} bytes \`);
-                        
-                        header.appendChild(textNode);                    
-
-                        const sectionsList = document.createElement('div');
-                        sectionsList.className = 'children hidden';
-                        region.sections.forEach(section => {
-                            const sectionDiv = document.createElement('div');
-                            sectionDiv.className = 'node';
-                            sectionDiv.textContent = \`\${section.name} - Address: 0x\${section.startAddress.toString(16)}, Size: \${section.size} bytes\`;
-                            sectionsList.appendChild(sectionDiv);
-                        });
-
-                        regionDiv.appendChild(header);
-                        regionDiv.appendChild(sectionsList);
-                        regionsContainer.appendChild(regionDiv);
-
-                    });
                 }
                     
                 function fillTableRegions(regions) {
@@ -539,7 +522,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
                                 const pointTd4 = document.createElement('td');
 
-                                const pointSize = document.createTextNode(\` \${formatBytes(symbol.size)} \`);
+                                const pointSize = document.createTextNode(\` \${symbol.size} B\`);
                                 pointTd4.appendChild(pointSize); 
 
                                 const pointTd5 = document.createElement('td');
@@ -556,22 +539,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                     });
                 }
                 document.addEventListener("DOMContentLoaded", () => {
-                    const regionsContainer = document.getElementById("regions");
-
-                    regionsContainer.addEventListener("click", (e) => {
-                        const toggle = e.target.closest(".toggle");
-                        if (toggle) {
-                            toggleNode(toggle);
-                        }
-                    });
-
-                    regionsContainer.addEventListener("dblclick", (e) => {
-                        const toggleRow = e.target.closest(".toggleRow");
-                        if (toggleRow) {
-                            const toggle = toggleRow.querySelector(".toggle");
-                            if (toggle) toggleNode(toggle);
-                        }
-                    });
+                    
 
                     function toggleNode(toggleElement) {
                         const children = toggleElement.closest(".node").querySelector(".children");
