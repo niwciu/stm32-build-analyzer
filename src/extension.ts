@@ -146,10 +146,10 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                             region.used += sectionSize;
                             continue;
                         }
-                        if(sectionLoadStart >= regionStart && sectionLoadStart < regionEnd) {
+                        if(sectionLoadStart >= regionStart && sectionLoadStart < regionEnd && name === '.data') {
                             region.sections.push({
                                 name,
-                                startAddress: sectionStart,
+                                startAddress: sectionLoadStart,
                                 size: sectionSize,
                                 loadAddress: sectionLoadStart,
                                 module,
@@ -208,6 +208,13 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                 table.gray tfoot .links {
                 text-align: right;
                 }
+                #regionsHead td {
+                text-align: center;
+                }
+                #regionsBody td {
+                padding-left: 5px;
+                padding-right: 5px;
+                }
                 .bar { 
                     background-color: var(--vscode-editorWidget-border); 
                     width: 100px; 
@@ -235,6 +242,19 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         </style>
         </head>
         <body>
+        <table id="regionsTable">
+            <thead id="regionsHead">
+                <tr>
+                    <td></td>
+                    <td>Name</td>
+                    <td>Address</td>
+                    <td>Size</td>
+                    <td>Notes</td>
+                </tr>
+            </thead>
+            <tbody id="regionsBody">
+            </tbody>
+        </table>
 			<pre id="regions" class="tree"></pre>
 			<script>
                 const vscode = acquireVsCodeApi();
@@ -246,8 +266,19 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 					const message = event.data;
 					if (message.command === 'showMapData') {
                         displayRegions(message.data);
+                        fillTableRegions(message.data);
                     }
 				});
+
+                function formatBytes(bytes, decimals = 2) {
+                    if (bytes === 0) return '0 Bytes';
+                    const k = 1024;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    const value = parseFloat((bytes / Math.pow(k, i)).toFixed(decimals));
+                    return \`\${value} \${sizes[i]}\`;
+                }
+
                 function displayRegions(regions) {
                     const regionsContainer = document.getElementById('regions');
                     regionsContainer.innerHTML = ''; // Очистить контейнер
@@ -258,6 +289,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
                         const header = document.createElement('div');
                         header.className = 'toggleRow';
+
                         const percent = region.used / region.size * 100;
                     
                         const bar = document.createElement('div');
@@ -296,6 +328,143 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
                     });
                 }
+                    
+                function fillTableRegions(regions) {
+                    const tableBody = document.getElementById('regionsBody');
+                    tableBody.innerHTML = ''; // Очистить контейнер
+
+                    id = 0;
+
+                    regions.forEach(region => {
+                        id++;
+                        const regionId = id;
+                        const percent = region.used / region.size * 100;
+
+                        const tableTr = document.createElement('tr');
+                        tableTr.className = 'toggleTr level-1';
+                        tableTr.setAttribute('data-level', '1');
+                        tableTr.setAttribute('data-id', regionId);
+                        const tableTd1 = document.createElement('td');
+
+                        const plus = document.createElement('span');
+                        plus.className = 'toggle';
+                        plus.textContent = \`+\`;
+                        tableTd1.appendChild(plus);
+                        
+                        const bar = document.createElement('div');
+                        bar.className = 'bar';
+                        const progress = document.createElement('div');
+                        if(percent > 95) {
+                            progress.setAttribute('style', \`width: \${percent}%; background-color: var(--vscode-minimap-errorHighlight); height: 100%;\`);
+                        } else if(percent > 75) {
+                            progress.setAttribute('style', \`width: \${percent}%; background-color: var(--vscode-minimap-warningHighlight); height: 100%;\`);
+                        } else {
+                            progress.setAttribute('style', \`width: \${percent}%; background-color: var(--vscode-minimap-infoHighlight); height: 100%;\`);
+                        }
+                        progress.textContent = \`\${percent.toFixed(2)}%\`;
+                        bar.appendChild(progress);
+                        tableTd1.appendChild(bar);
+
+                        const tableTd2 = document.createElement('td');
+
+                        const textNodeName = document.createTextNode(\` \${region.name} \`);
+                        tableTd2.appendChild(textNodeName); 
+
+                        const tableTd3 = document.createElement('td');
+
+                        const textNodeAddress = document.createTextNode(\` 0x\${region.startAddress.toString(16).padStart(8,'0')} \`);
+                        tableTd3.appendChild(textNodeAddress); 
+
+                        const tableTd4 = document.createElement('td');
+
+                        const textNodeSize = document.createTextNode(\` \${formatBytes(region.size)} \`);
+                        tableTd4.appendChild(textNodeSize); 
+
+                        const tableTd5 = document.createElement('td');
+
+                        const textNodeFreeSize = document.createTextNode(\` \${formatBytes(region.size-region.used)} free \`);
+                        tableTd5.appendChild(textNodeFreeSize); 
+                        
+                        tableTr.appendChild(tableTd1);
+                        tableTr.appendChild(tableTd2);
+                        tableTr.appendChild(tableTd3);
+                        tableTr.appendChild(tableTd4);
+                        tableTr.appendChild(tableTd5);
+                        tableBody.appendChild(tableTr);
+
+                        region.sections.forEach(section => {
+                            id++;
+                            sectionId = id;
+                            const sectionTr = document.createElement('tr');
+                            sectionTr.className = 'toggleTr level-2';
+                            sectionTr.setAttribute('data-level', '2');
+                            sectionTr.setAttribute('data-id', sectionId);
+                            sectionTr.setAttribute('data-parent', regionId);
+                            sectionTr.style.display = 'none';
+
+                            const sectionTd1 = document.createElement('td');
+                            
+                            const plus = document.createElement('span');
+                            plus.className = 'toggle';
+                            plus.textContent = \`+\`;
+                            sectionTd1.appendChild(plus);
+
+                            const sectionTd2 = document.createElement('td');
+
+                            const sectionName = document.createTextNode(\` \${section.name} \`);
+                            sectionTd2.appendChild(sectionName); 
+
+                            const sectionTd3 = document.createElement('td');
+
+                            const sectionAddress = document.createTextNode(\` 0x\${section.startAddress.toString(16).padStart(8,'0')} \`);
+                            sectionTd3.appendChild(sectionAddress); 
+
+                            const sectionTd4 = document.createElement('td');
+
+                            const sectionSize = document.createTextNode(\` \${formatBytes(section.size)} \`);
+                            sectionTd4.appendChild(sectionSize); 
+
+                            const sectionTd5 = document.createElement('td');
+
+                            
+                            sectionTr.appendChild(sectionTd1);
+                            sectionTr.appendChild(sectionTd2);
+                            sectionTr.appendChild(sectionTd3);
+                            sectionTr.appendChild(sectionTd4);
+                            sectionTr.appendChild(sectionTd5);
+
+                            tableBody.appendChild(sectionTr);
+                            for(i = 0; i < 4; i++) {
+                                id++;
+                                pointId = id;
+                                const pointTr = document.createElement('tr');
+                                pointTr.className = 'toggleTr level-3';
+                                pointTr.setAttribute('data-level', '3');
+                                pointTr.setAttribute('data-id', pointId);
+                                pointTr.setAttribute('data-parent', sectionId);
+                                pointTr.style.display = 'none';
+                                
+                                const pointTd1 = document.createElement('td');
+                                const pointTd2 = document.createElement('td');
+
+                                const pointName = document.createTextNode(\` point \`);
+                                pointTd2.appendChild(pointName); 
+
+                                const pointTd3 = document.createElement('td');
+                                const pointTd4 = document.createElement('td');
+                                const pointTd5 = document.createElement('td');
+
+                                pointTr.appendChild(pointTd1);
+                                pointTr.appendChild(pointTd2);
+                                pointTr.appendChild(pointTd3);
+                                pointTr.appendChild(pointTd4);
+                                pointTr.appendChild(pointTd5);
+
+                                tableBody.appendChild(pointTr);
+                            }
+                        });
+                    });
+                }
                 document.addEventListener("DOMContentLoaded", () => {
                     const regionsContainer = document.getElementById("regions");
 
@@ -321,6 +490,44 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                             toggleElement.textContent = children.classList.contains("hidden") ? "+" : "-";
                         }
                     }
+
+                    
+                    const regionsTable = document.getElementById("regionsTable");
+                    
+
+                    regionsTable.addEventListener("dblclick", (e) => {
+                        const tr = e.target.closest('tr');
+    
+                        if (!tr) return; // Если кликнули не по строке, выходим
+                        
+                        // Получаем уровень строки (data-level)
+                        const level = parseInt(tr.getAttribute('data-level'), 10);
+                        const parentId = tr.getAttribute('data-id'); // Идентификатор родительской строки
+
+                        function toggleVisibility(parentId) {\
+                            const childRows = document.querySelectorAll(\`tr[data-parent="\${parentId}"]\`);
+                            childRows.forEach(child => {\
+                                child.style.display = child.style.display === 'none' ? '' : 'none';\
+                                const childId = child.getAttribute('data-id');
+                                const childLevel = parseInt(child.getAttribute('data-level'), 10);
+                                if (child.style.display === 'none' && childLevel === 2) { \
+                                    const childChildRows = document.querySelectorAll(\`tr[data-parent="\${childId}"]\`);
+                                    childChildRows.forEach(c => {
+                                        if(c.style.display !== 'none') c.style.display = 'none';
+                                    });
+                                }
+                            });
+                        }
+                        
+                        const toggleSpan = tr.querySelector('.toggle');
+                        if (toggleSpan) {
+                            toggleSpan.textContent = toggleSpan.textContent === '+' ? '−' : '+';
+                        }
+                        toggleVisibility(parentId);
+                        
+                    });
+
+                    
                 });
 			</script>
         </body>
