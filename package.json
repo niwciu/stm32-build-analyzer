@@ -3,6 +3,7 @@
   "displayName": "STm32 Build Analyzer",
   "description": "STM32 Build Analyzer for VSCode",
   "version": "1.0.0",
+  "publisher": "ATwice291",
   "license": "MIT",
   "engines": {
     "vscode": "^1.96.0"
