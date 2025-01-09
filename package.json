@@ -2,13 +2,17 @@
   "name": "stm32-build-analyzer",
   "displayName": "STm32 Build Analyzer",
   "description": "STM32 Build Analyzer for VSCode",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "engines": {
     "vscode": "^1.96.0"
   },
   "categories": [
     "Other"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ATwice291/stm32-build-analyzer.git"
+  },
   "activationEvents": [
   ],
   "main": "./dist/extension.js",
