@@ -40,6 +40,9 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
         webviewView.webview.options = {
             enableScripts: true,
+            localResourceRoots: [
+                vscode.Uri.joinPath(this._context.extensionUri, 'resources')
+            ]
         };
 
 		const projectPath = vscode.workspace.workspaceFolders?.[0].uri.fsPath || '';
@@ -285,6 +288,15 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
     }
 
     private getHtmlContent(webview: vscode.Webview, elfFilePath: string|null): string {
+        const icon1Uri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this._context.extensionUri, 'resources', '1.png')
+        );
+        const icon2Uri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this._context.extensionUri, 'resources', '2.png')
+        );
+        const icon3Uri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this._context.extensionUri, 'resources', '3.png')
+        );
         return `
         <!DOCTYPE html>
         <html lang="en">
@@ -432,6 +444,15 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
                         const tableTd2 = document.createElement('td');
 
+                        const img = document.createElement('img');
+                        img.src = '${icon1Uri}';
+                        img.alt = 'Icon';
+                        img.style.width = '16px';
+                        img.style.height = '16px';
+                        img.style.verticalAlign = 'middle';
+                        img.style.marginRight = '5px';
+                        tableTd2.appendChild(img); 
+
                         const textNodeName = document.createTextNode(\` \${region.name} \`);
                         tableTd2.appendChild(textNodeName); 
 
@@ -476,8 +497,18 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
                             const sectionTd2 = document.createElement('td');
 
+                            const img = document.createElement('img');
+                            img.src = '${icon2Uri}';
+                            img.alt = 'Icon';
+                            img.style.width = '16px';
+                            img.style.height = '16px';
+                            img.style.verticalAlign = 'middle';
+                            img.style.marginRight = '5px';
+                            sectionTd2.appendChild(img); 
+
                             const sectionName = document.createTextNode(\` \${section.name} \`);
                             sectionTd2.appendChild(sectionName); 
+                            sectionTd2.setAttribute('style', \`padding-left: 15px;\`);
 
                             const sectionTd3 = document.createElement('td');
 
@@ -512,8 +543,18 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                                 const pointTd1 = document.createElement('td');
                                 const pointTd2 = document.createElement('td');
 
+                                const img = document.createElement('img');
+                                img.src = '${icon3Uri}';
+                                img.alt = 'Icon';
+                                img.style.width = '16px';
+                                img.style.height = '16px';
+                                img.style.verticalAlign = 'middle';
+                                img.style.marginRight = '5px';
+                                pointTd2.appendChild(img); 
+
                                 const pointName = document.createTextNode(\` \${symbol.name} \`);
                                 pointTd2.appendChild(pointName); 
+                                pointTd2.setAttribute('style', \`padding-left: 25px;\`);
 
                                 const pointTd3 = document.createElement('td');
 
