@@ -4,7 +4,7 @@
 
 This is my first attempt to make my own plugin for VSCode
 
-![Main view](images/1.JPG)
+![Main view](images/2.JPG)
 
 ## Features
 
