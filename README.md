@@ -18,7 +18,7 @@ This is my first attempt to make my own plugin for VSCode
 
 Initial STM32 Build Analyzer plugin release
 
-### 1.0.1
+### 1.0.2
 
 Added icons and indents
 
