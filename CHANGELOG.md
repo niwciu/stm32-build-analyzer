@@ -1,9 +1,7 @@
 # Change Log
 
-All notable changes to the "stm32-build-analyzer" extension will be documented in this file.
-
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
-
-## [Unreleased]
-
+## [1.0.0] - 2025-01-09
 - Initial release
+
+## [1.0.1] - 2025-01-10
+- Added icons and indents
