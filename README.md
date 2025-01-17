@@ -12,6 +12,7 @@ This is my first attempt to make my own plugin for VSCode
 * Memory region analysis from .map files.
 * Displays detailed memory usage, including sections and their sizes.
 * Compatible with any STM32-based project.
+* Symbols have links to source code.
 
 
 ### 1.0.0
@@ -21,6 +22,11 @@ Initial STM32 Build Analyzer plugin release
 ### 1.0.2
 
 Added icons and indents
+
+### 1.0.3
+
+- arm-none-eabi-objdump and arm-none-eabi-nm are used to get more accurate results
+- symbols now have links to source code
 
 ## License
 

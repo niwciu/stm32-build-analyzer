@@ -1,8 +1,8 @@
 {
   "name": "stm32-build-analyzer",
-  "displayName": "STm32 Build Analyzer",
+  "displayName": "STM32 Build Analyzer",
   "description": "STM32 Build Analyzer for VSCode",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "publisher": "ATwice291",
   "license": "MIT",
   "engines": {

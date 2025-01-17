@@ -2,8 +2,8 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as child_process from 'child_process';
 import * as fs from 'fs';
+import * as cp from 'child_process';
 
 interface Region {
     name: string,
@@ -25,6 +25,8 @@ interface Symbol {
     name: string;
     startAddress: number;
     size: number;
+    path: string;
+    row: number;
 }
 
 class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
@@ -47,6 +49,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
 		const projectPath = vscode.workspace.workspaceFolders?.[0].uri.fsPath || '';
         const mapFilePath = this.findMapFile(projectPath);
+        const elfFilePath = this.findElfFile(projectPath);
 
         webviewView.webview.html = this.getHtmlContent(webviewView.webview, "");
 
@@ -55,8 +58,11 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                 console.log('Received message:', message);
                 switch (message.command) {
                     case 'parseMapFile':
-                        const sections = this.parseMapFile(mapFilePath);
+                        const sections = this.parseMapAndElfFile(mapFilePath, elfFilePath);
                         webviewView.webview.postMessage({ command: 'showMapData', data: sections });
+                        return;
+                    case 'openFile':
+                        this.openFileAtLine(message.filePath, message.lineNumber);
                         return;
                 }
             },
@@ -65,60 +71,40 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         );
     }
 	
-	private findMapFile(projectPath: string): string {
+	private findElfFile(projectPath: string): string {
         const buildDir = path.join(projectPath, 'build', 'Debug');
         if (fs.existsSync(buildDir)) {
             const files = fs.readdirSync(buildDir);
-            const mapFile = files.find(file => file.endsWith('.map')); 
-            if (mapFile) {
-                return path.join(buildDir, mapFile); 
+            const elfFile = files.find(file => file.endsWith('.elf')); 
+            if (elfFile) {
+                return path.join(buildDir, elfFile); 
             }
         }
         return ``;
     }
 	    
-    private parseMapFile(mapFilePath: string): Region[] {
-        const content = fs.readFileSync(mapFilePath, 'utf8');
-        const lines = content.split('\n');
-        const sections: Section[] = [];
-
+    private parseMapAndElfFile(mapFilePath: string, elfFilePath: string): Region[] {
         const regions:Region[] = [];
 
         const regionRegex = /^\s*(\w+)\s+(0x[\da-fA-F]+)\s+(0x[\da-fA-F]+)\s+\w+/;
-        const sectionFullRegex = /^([a-zA-Z0-9._]+)\s+(0x[\da-fA-F]+)\s+(0x[\da-fA-F]+)(?:\s+load address\s+(0x[\da-fA-F]+))?\s+(.*)$/;
-        const sectionNameRegex = /^([a-zA-Z0-9._]+)/;
-        const sectionDataRegex = /^\s+(0x[\da-fA-F]+)\s+(0x[\da-fA-F]+)(?:\s+load address\s+(0x[\da-fA-F]+))?\s+(.*)$/;
 
-        const subSectionFullRegex = /^\s([a-zA-Z0-9._]+)\s+(0x[0-9a-fA-F]+)\s+(0x[0-9a-fA-F]+)\s+(.*)[\r\n]/;
-        const subSectionNameRegex = /^\s([a-zA-Z0-9._]+)[\r\n]/;
-        const subSectionDataRegex = /^\s+(0x[0-9a-fA-F]+)\s+(0x[0-9a-fA-F]+)\s+(.*)[\r\n]/;
+        const sectionRegex = /^\s*([\d]+)\s+([\.\w]+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+/;
 
-        const symbolsRegex = /^\s+(0x[0-9a-fA-F]+)\s+([a-zA-Z0-9._]+)[\r\n]/;
+        const symbolRegex = /^([0-9A-Fa-f]+)\s+([0-9A-Fa-f]+)?\s*([a-zA-Z]+)\s+([\S]+)\s*([\S]*)?\s*/;
+        const pathRegex = /(.*):(\d+)$/;
 
         let isRegion = false;
-        let isSection = false;
 
-        let combinedStr: string | null = null;
-
-        let actualSectionName: string = "";
-        let actualSectionStartAddress: number = 0;
-        let actualSectionSize: number = 0;
-        let symbols: Symbol[] = [];
-
-        let lastLine: string = "";
+        //parsing MAP
+        const content = fs.readFileSync(mapFilePath, 'utf8');
+        const lines = content.split('\n');
         for (const line of lines) {
-            if(lastLine === line) {
-                continue;
-            }
             if (line.startsWith('Memory Configuration')) {
                 isRegion = true;
-                isSection = false;
                 continue;
             }
             if (line.startsWith('Linker script and memory map')) {
-                isRegion = false;
-                isSection = true;
-                continue;
+                break;
             }
             
             if(isRegion) {
@@ -134,60 +120,22 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                     });
                 }
             }
-
-            if(isSection) {
-                
-                let match = sectionFullRegex.exec(line);
-                if(!match) {
-                    const nameMatch = sectionNameRegex.exec(line);
-                    if(nameMatch) {
-                        combinedStr = line.trim();
-                        continue;
-                    }
-
-                    const dataMatch = sectionDataRegex.exec(line);
-                    if(combinedStr && dataMatch) {
-                        combinedStr += ' ' + line;
-                    }
-                    
-                    match = sectionFullRegex.exec(combinedStr?combinedStr:line);
-                }
-                
-                if(match) {
-                    const [, name, startAddress, sizeHex, loadAddress, ] = match;
-                    const sectionStart = parseInt(startAddress, 16);
-                    const sectionSize = parseInt(sizeHex, 16);
-                    const sectionLoadStart = parseInt(loadAddress, 16);
-                    if(sectionStart === 0 || sectionSize === 0) {
-                        continue;
-                    }
-                    if(actualSectionSize > 0) {
-                        if(symbols.length > 0) {
-                            const lastSym = symbols.at(-1)!;
-                            lastSym.size = actualSectionStartAddress + actualSectionSize - lastSym.startAddress;
-                        } else {
-                            symbols.push({
-                                name: actualSectionName,
-                                startAddress: actualSectionStartAddress,
-                                size: actualSectionSize
-                            });
-                        }
-                        for(const region of regions) {
-                            for(const section of region.sections) {
-                                if(actualSectionStartAddress >= section.startAddress && actualSectionStartAddress < section.startAddress+section.size) {
-                                    for(const symbol of symbols) {
-                                        section.symbols.push({
-                                            name: symbol.name,
-                                            startAddress: symbol.startAddress,
-                                            size: symbol.size
-                                        });
-                                    }
-                                    symbols = [];
-                                }
-                            }
-                        }
-                        actualSectionSize = 0;
-                    }
+        }
+        //parsing OBJDUMP ELF
+        try {
+            const result = cp.spawnSync('arm-none-eabi-objdump', ['-h', elfFilePath]);
+            if (result.error) {
+                console.error('Error executing command:', result.error);
+            } else {
+                const lines = result.stdout.toString().split('\n');
+                for (const line of lines) {
+                    const match = sectionRegex.exec(line);
+                    if(!match) { continue;}
+                    const [, , name, size, address, load] = match;
+                    const sectionStart = parseInt(address, 16);
+                    const sectionSize = parseInt(size, 16);
+                    if(sectionSize === 0) { continue; }
+                    const sectionLoadStart = parseInt(load, 16);
                     for(const region of regions) {
                         const regionStart = region.startAddress;
                         const regionEnd = regionStart + region.size;
@@ -205,7 +153,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                         if(sectionLoadStart >= regionStart && sectionLoadStart < regionEnd && name === '.data') {
                             region.sections.push({
                                 name,
-                                startAddress: sectionStart,
+                                startAddress: sectionLoadStart,
                                 size: sectionSize,
                                 loadAddress: sectionLoadStart,
                                 symbols: []
@@ -213,78 +161,88 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                             region.used += sectionSize;
                         }
                     }
+                    
                 }
-
-                match = subSectionFullRegex.exec(line);
-                if(!match) {
-                    const symbolNameMatch = subSectionNameRegex.exec(line);
-                    if(symbolNameMatch) {
-                        combinedStr = ' ' + line.trim();
-                        continue;
-                    }
-    
-                    const symbolDataMatch = subSectionDataRegex.exec(line);
-                    if(combinedStr && symbolDataMatch) {
-                        combinedStr += ' ' + line;
-                    }
-
-                    match = subSectionFullRegex.exec(combinedStr?combinedStr:line);
-                }
-
-                if(match) {
-                    const [, name, startAddress, sizeHex, ] = match;
-                    const subSectionStart = parseInt(startAddress, 16);
-                    const subSectionSize = parseInt(sizeHex, 16);
-                    if(actualSectionSize > 0) {
-                        if(symbols.length > 0) {
-                            const lastSym = symbols.at(-1)!;
-                            lastSym.size = actualSectionStartAddress + actualSectionSize - lastSym.startAddress;
-                        } else {
-                            symbols.push({
-                                name: actualSectionName,
-                                startAddress: actualSectionStartAddress,
-                                size: actualSectionSize
-                            });
-                        }
-                        for(const region of regions) {
-                            for(const section of region.sections) {
-                                if(actualSectionStartAddress >= section.startAddress && actualSectionStartAddress < section.startAddress+section.size) {
-                                    for(const symbol of symbols) {
-                                        section.symbols.push({
-                                            name: symbol.name,
-                                            startAddress: symbol.startAddress,
-                                            size: symbol.size
-                                        });
-                                    }
-                                    symbols = [];
-                                }
-                            }
-                        }
-                        actualSectionSize = 0;
-                    }
-                    actualSectionName = name;
-                    actualSectionStartAddress = subSectionStart;
-                    actualSectionSize = subSectionSize;
-                }
-                
-                match = symbolsRegex.exec(line);
-                if(match) {
-                    const [, startAddress, name, ] = match;
-                    const symbolStart = parseInt(startAddress, 16);
-                    symbols.push({
-                        name,
-                        startAddress: symbolStart,
-                        size: 0
-                    });
-                }
-
-
-                combinedStr = null;
             }
-
-            lastLine = line;
+        } catch (error) {
+            console.error('error', error);
+        }
+        //parsing NM ELF
+        try {
+            const result = cp.spawnSync('arm-none-eabi-nm', ['-C', '-S', '-n', '-l', elfFilePath]);
+            if (result.error) {
+                console.error('Error executing command:', result.error);
+            } else {
+                const lines = result.stdout.toString().split('\n');
+                for (const line of lines) {
+                    const match = symbolRegex.exec(line);
+                    if(!match) { continue;}
+                    const [, address, size, type, name, path] = match;
+                    const symbolStart = parseInt(address, 16);
+                    const symbolSize = Number.isNaN(parseInt(size, 16))? 0 : parseInt(size, 16);
+                    const pathMatch = pathRegex.exec(path);
+                    let filePath: string = "";
+                    let fileRow: number = 0;
+                    if(!pathMatch) { 
+                        filePath = "";
+                        fileRow = 0;
+                    } else {
+                        const [, filePathStr, fileRowStr] = pathMatch;
+                        filePath = filePathStr;
+                        fileRow = parseInt(fileRowStr, 10);
+                    }
+                    for(const region of regions) {
+                        const regionStart = region.startAddress;
+                        const regionEnd = regionStart + region.size;
+                        if(symbolStart < regionStart || symbolStart >= regionEnd) {continue;}
+                        for(const section of region.sections) {
+                            const sectionStart = section.startAddress;
+                            const sectionEnd = sectionStart + section.size;
+                            if(symbolStart < sectionStart || symbolStart >= sectionEnd) {continue;}
+                            section.symbols.push({
+                                name: name,
+                                startAddress: symbolStart,
+                                size: symbolSize,
+                                path: filePath,
+                                row: fileRow
+                            });
+                            break;
+                        }                        
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('error', error);
         }
         return regions;
+    }
+	
+	private findMapFile(projectPath: string): string {
+        const buildDir = path.join(projectPath, 'build', 'Debug');
+        if (fs.existsSync(buildDir)) {
+            const files = fs.readdirSync(buildDir);
+            const mapFile = files.find(file => file.endsWith('.map')); 
+            if (mapFile) {
+                return path.join(buildDir, mapFile); 
+            }
+        }
+        return ``;
+    }
+
+    private async openFileAtLine(filePath: string, lineNumber: number) {
+        try {
+            const fileUri = vscode.Uri.file(filePath);
+            const document = await vscode.workspace.openTextDocument(fileUri);
+            const editor = await vscode.window.showTextDocument(document);
+            const position = new vscode.Position(lineNumber - 1, 0);
+            editor.selection = new vscode.Selection(position, position);
+            editor.revealRange(
+                new vscode.Range(position, position),
+                vscode.TextEditorRevealType.InCenter
+            );
+        } catch (error) {
+            vscode.window.showErrorMessage(`File opening error: ${filePath}`);
+        }
     }
 
     private getHtmlContent(webview: vscode.Webview, elfFilePath: string|null): string {
@@ -542,6 +500,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                                 
                                 const pointTd1 = document.createElement('td');
                                 const pointTd2 = document.createElement('td');
+                                pointTd2.setAttribute('title', \`\${symbol.path} : \${symbol.row}\`);
 
                                 const img = document.createElement('img');
                                 img.src = '${icon3Uri}';
@@ -552,8 +511,20 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                                 img.style.marginRight = '5px';
                                 pointTd2.appendChild(img); 
 
-                                const pointName = document.createTextNode(\` \${symbol.name} \`);
-                                pointTd2.appendChild(pointName); 
+                                if(symbol.path == '') {
+                                    const pointName = document.createTextNode(\` \${symbol.name} \`);
+                                    pointTd2.appendChild(pointName);
+                                } else {
+                                    const link = document.createElement('a');
+                                    link.className = 'source-link';
+                                    link.setAttribute('href', '#');
+                                    link.setAttribute('data-file', \`\${symbol.path}\`);
+                                    link.setAttribute('data-line', \`\${symbol.row}\`);
+                                    const pointName = document.createTextNode(\` \${symbol.name} \`);
+                                    link.appendChild(pointName);
+                                    pointTd2.appendChild(link);
+                                }
+
                                 pointTd2.setAttribute('style', \`padding-left: 25px;\`);
 
                                 const pointTd3 = document.createElement('td');
@@ -566,7 +537,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                                 const pointSize = document.createTextNode(\` \${symbol.size} B\`);
                                 pointTd4.appendChild(pointSize); 
 
-                                const pointTd5 = document.createElement('td');
+                                const pointTd5 = document.createElement('td');                                
 
                                 pointTr.appendChild(pointTd1);
                                 pointTr.appendChild(pointTd2);
@@ -581,7 +552,6 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                 }
                 document.addEventListener("DOMContentLoaded", () => {
                     
-
                     function toggleNode(toggleElement) {
                         const children = toggleElement.closest(".node").querySelector(".children");
                         if (children) {
@@ -590,18 +560,14 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                         }
                     }
 
-                    
                     const regionsTable = document.getElementById("regionsTable");
-                    
-
+                
                     regionsTable.addEventListener("dblclick", (e) => {
                         const tr = e.target.closest('tr');
-    
-                        if (!tr) return; // Если кликнули не по строке, выходим
-                        
-                        // Получаем уровень строки (data-level)
+                        if (!tr) return;
+
                         const level = parseInt(tr.getAttribute('data-level'), 10);
-                        const parentId = tr.getAttribute('data-id'); // Идентификатор родительской строки
+                        const parentId = tr.getAttribute('data-id');
 
                         function toggleVisibility(parentId) {\
                             const childRows = document.querySelectorAll(\`tr[data-parent="\${parentId}"]\`);
@@ -623,10 +589,24 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                             toggleSpan.textContent = toggleSpan.textContent === '+' ? '−' : '+';
                         }
                         toggleVisibility(parentId);
-                        
                     });
 
-                    
+                    regionsTable.addEventListener('click', (event) => {
+                        if (event.target.classList.contains('source-link')) {
+                            event.preventDefault();
+
+                            const filePath = event.target.dataset.file;
+                            const lineNumber = parseInt(event.target.dataset.line, 10);
+
+                            vscode.postMessage({
+                                command: 'openFile',
+                                filePath: filePath,
+                                lineNumber: lineNumber
+                            });
+
+                            event.stopPropagation();
+                        }
+                    });
                 });
 			</script>
         </body>
@@ -635,17 +615,14 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
     }
 }
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
-            "buildAnalyzer", // ID панели, зарегистрированной в package.json
+            "buildAnalyzer",
             new BuildAnalyzerProvider(context)
         )
     );
 }
 
-// This method is called when your extension is deactivated
 export function deactivate() {}
 
