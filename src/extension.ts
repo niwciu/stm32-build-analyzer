@@ -69,6 +69,19 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
             undefined,
             this._context.subscriptions
         );
+
+        vscode.tasks.onDidStartTaskProcess((event) => {
+            if (event.execution.task.name.match(/\bclean\b/)) {
+                webviewView.webview.postMessage({ command: 'resetMapData' });
+            }
+        });
+        
+        vscode.tasks.onDidEndTaskProcess((event) => {
+            if (event.execution.task.name.match(/\bbuild\b/) || event.execution.task.name.match(/\brebuild\b/)) {
+                const sections = this.parseMapAndElfFile(mapFilePath, elfFilePath);
+                webviewView.webview.postMessage({ command: 'showMapData', data: sections });
+            }
+        });
     }
 	
 	private findElfFile(projectPath: string): string {
@@ -89,6 +102,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         const regionRegex = /^\s*(\w+)\s+(0x[\da-fA-F]+)\s+(0x[\da-fA-F]+)\s+\w+/;
 
         const sectionRegex = /^\s*([\d]+)\s+([\.\w]+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+/;
+        const allocRegex = /\bALLOC\b/;
 
         const symbolRegex = /^([0-9A-Fa-f]+)\s+([0-9A-Fa-f]+)?\s*([a-zA-Z]+)\s+([\S]+)\s*([\S]*)?\s*/;
         const pathRegex = /(.*):(\d+)$/;
@@ -128,8 +142,14 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                 console.error('Error executing command:', result.error);
             } else {
                 const lines = result.stdout.toString().split('\n');
+                let prevLine: string = "";
                 for (const line of lines) {
-                    const match = sectionRegex.exec(line);
+                    const allocMatch = allocRegex.exec(line);
+                    if(!allocMatch) {
+                        prevLine = line;
+                        continue;
+                    }
+                    const match = sectionRegex.exec(prevLine);
                     if(!match) { continue;}
                     const [, , name, size, address, load] = match;
                     const sectionStart = parseInt(address, 16);
@@ -169,7 +189,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         }
         //parsing NM ELF
         try {
-            const result = cp.spawnSync('arm-none-eabi-nm', ['-C', '-S', '-n', '-l', elfFilePath]);
+            const result = cp.spawnSync('arm-none-eabi-nm', ['-C', '-S', '-n', '-l', '--defined-only', elfFilePath]);
             if (result.error) {
                 console.error('Error executing command:', result.error);
             } else {
@@ -353,20 +373,28 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 					if (message.command === 'showMapData') {
                         fillTableRegions(message.data);
                     }
+					if (message.command === 'resetMapData') {
+                        resetTableRegions();
+                    }
 				});
 
                 function formatBytes(bytes, decimals = 2) {
-                    if (bytes === 0) return '0 B';
+                    if (bytes <= 0) return '0 B';
                     const k = 1024;
                     const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
                     const i = Math.floor(Math.log(bytes) / Math.log(k));
                     const value = parseFloat((bytes / Math.pow(k, i)).toFixed(decimals));
                     return \`\${value} \${sizes[i]}\`;
                 }
+
+                function resetTableRegions() {
+                    const tableBody = document.getElementById('regionsBody');
+                    tableBody.innerHTML = '';
+                }
                     
                 function fillTableRegions(regions) {
                     const tableBody = document.getElementById('regionsBody');
-                    tableBody.innerHTML = ''; // Очистить контейнер
+                    tableBody.innerHTML = '';
 
                     id = 0;
 

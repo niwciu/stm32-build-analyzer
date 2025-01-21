@@ -28,6 +28,9 @@ Added icons and indents
 - arm-none-eabi-objdump and arm-none-eabi-nm are used to get more accurate results
 - symbols now have links to source code
 
+### 1.0.4
+- fixed a bug causing incorrect operations with sectors at address 0x00000000 (e.g., ITCMRAM)
+
 ## License
 
 This extension is licensed under the [MIT License](LICENSE).
