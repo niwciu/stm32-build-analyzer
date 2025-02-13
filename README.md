@@ -31,6 +31,9 @@ Added icons and indents
 ### 1.0.4
 - fixed a bug causing incorrect operations with sectors at address 0x00000000 (e.g., ITCMRAM)
 
+### 1.0.5
+- the plugin worked only with the 'Debug' build type - fixed. now the plugin gets the build type name from the CMake Tools extension
+
 ## License
 
 This extension is licensed under the [MIT License](LICENSE).

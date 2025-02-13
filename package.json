@@ -2,7 +2,7 @@
   "name": "stm32-build-analyzer",
   "displayName": "STM32 Build Analyzer",
   "description": "STM32 Build Analyzer for VSCode",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "publisher": "ATwice291",
   "license": "MIT",
   "engines": {
@@ -44,6 +44,9 @@
         ]
     }
   },
+  "extensionDependencies": [
+    "ms-vscode.cmake-tools"
+  ],
   "scripts": {
     "vscode:prepublish": "npm run package",
     "compile": "webpack",

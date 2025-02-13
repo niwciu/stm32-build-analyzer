@@ -32,9 +32,16 @@ interface Symbol {
 class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
     private _context: vscode.ExtensionContext;
     private _view: vscode.WebviewView | undefined;
+    private _buildType: string;
+    private _mapFilePath: string;
+    private _elfFilePath: string;
 
     constructor(context: vscode.ExtensionContext) {
         this._context = context;
+		const projectPath = vscode.workspace.workspaceFolders?.[0].uri.fsPath || '';
+        this._buildType = 'Debug';
+        this._mapFilePath = this.findFile(projectPath, '.map');
+        this._elfFilePath = this.findFile(projectPath, '.elf');
     }
 
     resolveWebviewView(webviewView: vscode.WebviewView, context: vscode.WebviewViewResolveContext, token: vscode.CancellationToken): void {
@@ -48,8 +55,15 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         };
 
 		const projectPath = vscode.workspace.workspaceFolders?.[0].uri.fsPath || '';
-        const mapFilePath = this.findMapFile(projectPath);
-        const elfFilePath = this.findElfFile(projectPath);
+        
+        this.getCurrentBuildType().then(value => {
+            if(value) {
+                this._buildType = value;
+                this._mapFilePath = this.findFile(projectPath, '.map');
+                this._elfFilePath = this.findFile(projectPath, '.elf');
+            }
+        });
+
 
         webviewView.webview.html = this.getHtmlContent(webviewView.webview, "");
 
@@ -58,8 +72,16 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                 console.log('Received message:', message);
                 switch (message.command) {
                     case 'parseMapFile':
-                        const sections = this.parseMapAndElfFile(mapFilePath, elfFilePath);
-                        webviewView.webview.postMessage({ command: 'showMapData', data: sections });
+                        this.getCurrentBuildType().then(value => {
+                            if(value) {
+                                this._buildType = value;
+                                this._mapFilePath = this.findFile(projectPath, '.map');
+                                this._elfFilePath = this.findFile(projectPath, '.elf');
+                                const sections = this.parseMapAndElfFile(this._mapFilePath, this._elfFilePath);
+                                webviewView.webview.postMessage({ command: 'showMapData', data: sections });
+                            }
+                        });
+
                         return;
                     case 'openFile':
                         this.openFileAtLine(message.filePath, message.lineNumber);
@@ -78,17 +100,41 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         
         vscode.tasks.onDidEndTaskProcess((event) => {
             if (event.execution.task.name.match(/\bbuild\b/) || event.execution.task.name.match(/\brebuild\b/)) {
-                const sections = this.parseMapAndElfFile(mapFilePath, elfFilePath);
-                webviewView.webview.postMessage({ command: 'showMapData', data: sections });
+                this.getCurrentBuildType().then(value => {
+                    if(value) {
+                        this._buildType = value;
+                        this._mapFilePath = this.findFile(projectPath, '.map');
+                        this._elfFilePath = this.findFile(projectPath, '.elf');
+                        const sections = this.parseMapAndElfFile(this._mapFilePath, this._elfFilePath);
+                        webviewView.webview.postMessage({ command: 'showMapData', data: sections });
+                    }
+                });
             }
         });
     }
+
+    private async getCurrentBuildType(): Promise<string> {
+        // Проверяем наличие CMake Tools
+        const cmakeExtension = vscode.extensions.getExtension('ms-vscode.cmake-tools');
+        if (cmakeExtension) {
+            if (!cmakeExtension.isActive) {
+                await cmakeExtension.activate();
+            }
+            
+            const cmakeApi = cmakeExtension.exports;
+            const cmakeApiInstance = cmakeApi.getApi(2);
+            const activeProject = cmakeApiInstance.manager.projectController.activeProject;
+            const buildType = activeProject._buildPreset._value.configurePreset;
+            return buildType ?? 'Debug';
+        }
+        return 'Debug';
+    }
 	
-	private findElfFile(projectPath: string): string {
-        const buildDir = path.join(projectPath, 'build', 'Debug');
+	private findFile(projectPath: string, fileExt: string): string {
+        const buildDir = path.join(projectPath, 'build', this._buildType);
         if (fs.existsSync(buildDir)) {
             const files = fs.readdirSync(buildDir);
-            const elfFile = files.find(file => file.endsWith('.elf')); 
+            const elfFile = files.find(file => file.endsWith(fileExt)); 
             if (elfFile) {
                 return path.join(buildDir, elfFile); 
             }
@@ -235,18 +281,6 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
             console.error('error', error);
         }
         return regions;
-    }
-	
-	private findMapFile(projectPath: string): string {
-        const buildDir = path.join(projectPath, 'build', 'Debug');
-        if (fs.existsSync(buildDir)) {
-            const files = fs.readdirSync(buildDir);
-            const mapFile = files.find(file => file.endsWith('.map')); 
-            if (mapFile) {
-                return path.join(buildDir, mapFile); 
-            }
-        }
-        return ``;
     }
 
     private async openFileAtLine(filePath: string, lineNumber: number) {
