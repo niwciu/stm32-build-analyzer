@@ -1,10 +1,31 @@
-# STM32 Build Analyzer
+# STM32 Build Analyzer (Enhanced)
 
-## Overview
-
-This is my first attempt to make my own plugin for VSCode
+**Community-maintained fork of [ATwice291/stm32-build-analyzer](https://github.com/ATwice291/stm32-build-analyzer)**  
+*Original version by Aleksei Perevozchikov (ATwice291), licensed under MIT.*
 
 ![Main view](images/2.JPG)
+
+## Key Improvements in This Fork
+
+✅ **Removed CMake dependency** - Works with any build system  
+✅ **Custom build folder support** - Configure your build directory in settings  
+✅ **Improved file discovery** - Better handling of .map/.elf files  
+✅ **Optimized UI** - Enhanced memory visualization  
+
+## Features
+
+- Memory region analysis from linker map files
+- Detailed section/symbol breakdown with source code links
+- Visual memory usage indicators (color-coded thresholds)
+- Support for all STM32 projects (not limited to CMake)
+- ARM toolchain integration (`arm-none-eabi-objdump`, `arm-none-eabi-nm`)
+
+## Installation
+
+1. Install from [VS Code Marketplace](LINK_TO_YOUR_EXTENSION)  
+   or  
+   ```bash
+   code --install-extension stm32-build-analyzer-enhanced-*.vsix
 
 ## Features
 

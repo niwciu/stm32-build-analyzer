@@ -1,9 +1,9 @@
 {
-  "name": "stm32-build-analyzer",
-  "displayName": "STM32 Build Analyzer",
-  "description": "STM32 Build Analyzer for VSCode",
-  "version": "1.0.6",
-  "publisher": "ATwice291",
+  "name": "stm32-build-analyzer-enhanced",
+  "displayName": "STM32 Build Analyzer (Enhanced)", 
+  "description": "STM32 Build Analyzer for VSCode - Fork of ATwice291/stm32-build-analyzer with additional features...",
+  "version": "1.0.0",
+  "publisher": "niwciu",
   "license": "MIT",
   "engines": {
     "vscode": "^1.96.0"
@@ -13,39 +13,60 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/ATwice291/stm32-build-analyzer.git"
+    "url": "https://github.com/niwciu/stm32-build-analyzer.git"
   },
   "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "stm32-build-analyzer.openTab",
-        "title": "STM32 Build Analyzer"
+        "command": "stm32BuildAnalyzerEnhanced.openTab",
+        "title": "STM32 Build Analyzer (Enhanced)"
+      },
+      {
+        "command": "stm32BuildAnalyzerEnhanced.refresh",
+        "title": "Refresh STM32 Build Analyzer (Enhanced) Paths"
       }
     ],
+    "configuration": {
+      "title": "STM32 Build Analyzer (Enhanced)",
+      "properties": {
+        "stm32BuildAnalyzerEnhanced.buildFolder": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the build folder (relative to workspace or absolute)"
+        },
+        "stm32BuildAnalyzerEnhanced.mapFilePath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the .map file (overrides automatic search)"
+        },
+        "stm32BuildAnalyzerEnhanced.elfFilePath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the .elf file (overrides automatic search)"
+        }
+      }
+    },
     "viewsContainers": {
       "panel": [
         {
-          "id": "buildAnalyzerPanel",
-          "title": "Build Analyzer",
+          "id": "buildAnalyzerEnhancedPanel",
+          "title": "Build Analyzer (Enhanced)",
           "icon": "resources/icon.png"
         }
       ]
     },
     "views": {
-      "buildAnalyzerPanel": [
+      "buildAnalyzerEnhancedPanel": [
         {
-          "id": "buildAnalyzer",
-          "name": "Build Analyzer",
+          "id": "buildAnalyzerEnhanced",
+          "name": "Build Analyzer (Enhanced)",
           "type": "webview"
         }
       ]
     }
   },
-  "extensionDependencies": [
-    "ms-vscode.cmake-tools"
-  ],
   "scripts": {
     "vscode:prepublish": "npm run package",
     "compile": "webpack",

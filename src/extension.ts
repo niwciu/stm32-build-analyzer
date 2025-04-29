@@ -1,12 +1,10 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as cp from 'child_process';
 
 interface Region {
-    name: string,
+    name: string;
     startAddress: number;
     size: number;
     used: number;
@@ -32,130 +30,218 @@ interface Symbol {
 class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
     private _context: vscode.ExtensionContext;
     private _view: vscode.WebviewView | undefined;
-    private _buildType: string;
-    private _mapFilePath: string;
-    private _elfFilePath: string;
+    private _mapFilePath: string = "";
+    private _elfFilePath: string = "";
+    private _buildFolder: string = "";
 
     constructor(context: vscode.ExtensionContext) {
         this._context = context;
-		const projectPath = vscode.workspace.workspaceFolders?.[0].uri.fsPath || '';
-        this._buildType = 'Debug';
-        this._mapFilePath = this.findFile(projectPath, '.map');
-        this._elfFilePath = this.findFile(projectPath, '.elf');
+        this.updateFilePaths();
     }
 
-    resolveWebviewView(webviewView: vscode.WebviewView, context: vscode.WebviewViewResolveContext, token: vscode.CancellationToken): void {
-		this._view = webviewView;
+    public resolveWebviewView(webviewView: vscode.WebviewView): void {
+        this._view = webviewView;
 
         webviewView.webview.options = {
             enableScripts: true,
-            localResourceRoots: [
-                vscode.Uri.joinPath(this._context.extensionUri, 'resources')
-            ]
+            localResourceRoots: [this._context.extensionUri]
         };
 
-		const projectPath = vscode.workspace.workspaceFolders?.[0].uri.fsPath || '';
-        
-        this.getCurrentBuildType().then(value => {
-            if(value) {
-                this._buildType = value;
-                this._mapFilePath = this.findFile(projectPath, '.map');
-                this._elfFilePath = this.findFile(projectPath, '.elf');
-            }
-        });
+        webviewView.webview.html = this.getHtmlContent(webviewView.webview);
 
-
-        webviewView.webview.html = this.getHtmlContent(webviewView.webview, "");
-
-        webviewView.webview.onDidReceiveMessage(
-            message => {
-                console.log('Received message:', message);
-                switch (message.command) {
-                    case 'parseMapFile':
-                        this.getCurrentBuildType().then(value => {
-                            if(value) {
-                                this._buildType = value;
-                                this._mapFilePath = this.findFile(projectPath, '.map');
-                                this._elfFilePath = this.findFile(projectPath, '.elf');
-                                const sections = this.parseMapAndElfFile(this._mapFilePath, this._elfFilePath);
-                                webviewView.webview.postMessage({ command: 'showMapData', data: sections });
-                            }
-                        });
-
-                        return;
-                    case 'openFile':
-                        this.openFileAtLine(message.filePath, message.lineNumber);
-                        return;
-                }
-            },
-            undefined,
-            this._context.subscriptions
-        );
-
-        vscode.tasks.onDidStartTaskProcess((event) => {
-            if (event.execution.task.name.match(/\bclean\b/)) {
-                webviewView.webview.postMessage({ command: 'resetMapData' });
-            }
-        });
-        
-        vscode.tasks.onDidEndTaskProcess((event) => {
-            if (event.execution.task.name.match(/\bbuild\b/) || event.execution.task.name.match(/\brebuild\b/)) {
-                this.getCurrentBuildType().then(value => {
-                    if(value) {
-                        this._buildType = value;
-                        this._mapFilePath = this.findFile(projectPath, '.map');
-                        this._elfFilePath = this.findFile(projectPath, '.elf');
-                        const sections = this.parseMapAndElfFile(this._mapFilePath, this._elfFilePath);
-                        webviewView.webview.postMessage({ command: 'showMapData', data: sections });
+        webviewView.webview.onDidReceiveMessage(async (message) => {
+            switch (message.command) {
+                case 'parseMapFile':
+                    if (this._mapFilePath && this._elfFilePath) {
+                        try {
+                            const regions = this.parseMapAndElfFile(this._mapFilePath, this._elfFilePath);
+                            webviewView.webview.postMessage({
+                                command: 'showMapData',
+                                data: regions
+                            });
+                        } catch (error) {
+                            vscode.window.showErrorMessage(`Error parsing files: ${error instanceof Error ? error.message : String(error)}`);
+                        }
+                    } else {
+                        webviewView.webview.postMessage({ command: 'resetMapData' });
                     }
-                });
+                    break;
+                case 'openFile':
+                    await this.openFileAtLine(message.filePath, message.lineNumber);
+                    break;
             }
         });
+
+        if (this._mapFilePath && this._elfFilePath) {
+            this.parseAndSendData(webviewView);
+        }
     }
 
-    private async getCurrentBuildType(): Promise<string> {
-        // Проверяем наличие CMake Tools
-        const cmakeExtension = vscode.extensions.getExtension('ms-vscode.cmake-tools');
-        if (cmakeExtension) {
-            if (!cmakeExtension.isActive) {
-                await cmakeExtension.activate();
-            }
-            
-            const cmakeApi = cmakeExtension.exports;
-            const cmakeApiInstance = cmakeApi.getApi(2);
-            const activeProject = cmakeApiInstance.manager.projectController.activeProject;
-            const buildType = activeProject._buildPreset._value.configurePreset;
-            return buildType ?? 'Debug';
+    private async parseAndSendData(webviewView: vscode.WebviewView) {
+        try {
+            const regions = this.parseMapAndElfFile(this._mapFilePath, this._elfFilePath);
+            webviewView.webview.postMessage({
+                command: 'showMapData',
+                data: regions
+            });
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to parse files: ${error instanceof Error ? error.message : String(error)}`);
         }
-        return 'Debug';
     }
-	
-	private findFile(projectPath: string, fileExt: string): string {
-        const buildDir = path.join(projectPath, 'build', this._buildType);
-        if (fs.existsSync(buildDir)) {
-            const files = fs.readdirSync(buildDir);
-            const elfFile = files.find(file => file.endsWith(fileExt)); 
-            if (elfFile) {
-                return path.join(buildDir, elfFile); 
+
+    public async updateFilePaths(): Promise<void> {
+        const config = vscode.workspace.getConfiguration('stm32BuildAnalyzer');
+        this._buildFolder = config.get<string>('buildFolder') || "";
+
+        try {
+            const customMapPath = config.get<string>('mapFilePath');
+            const customElfPath = config.get<string>('elfFilePath');
+
+            this._mapFilePath = customMapPath && fs.existsSync(customMapPath) 
+                ? customMapPath 
+                : await this.findValidFile('.map');
+
+            this._elfFilePath = customElfPath && fs.existsSync(customElfPath)
+                ? customElfPath
+                : await this.findValidFile('.elf');
+
+            if (!this._mapFilePath || !this._elfFilePath) {
+                vscode.window.showErrorMessage("No .map or .elf files found! Check configuration.");
+            } else if (this._view) {
+                this._view.webview.postMessage({ command: 'parseMapFile' });
             }
+        } catch (error) {
+            vscode.window.showErrorMessage(`Error updating file paths: ${error instanceof Error ? error.message : String(error)}`);
         }
-        return ``;
     }
-	    
+
+    private async findValidFile(fileExt: string): Promise<string> {
+        const filePath = await this.findFile(fileExt);
+        if (!filePath) {return "";}
+        
+        try {
+            // Basic file validation
+            fs.accessSync(filePath, fs.constants.R_OK);
+            if (fileExt === '.map' && fs.readFileSync(filePath, 'utf8').length === 0) {
+                throw new Error("Map file is empty");
+            }
+            return filePath;
+        } catch (error) {
+            vscode.window.showWarningMessage(`Invalid ${fileExt} file: ${path.basename(filePath)}`);
+            return "";
+        }
+    }
+
+    private async findFile(fileExt: string): Promise<string> {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders) {
+            return "";
+        }
+
+        const rootPath = workspaceFolders[0].uri.fsPath;
+        const foundFiles: string[] = [];
+
+        const findFilesRecursively = (dir: string): void => {
+            try {
+                const entries = fs.readdirSync(dir, { withFileTypes: true });
+                for (const entry of entries) {
+                    const fullPath = path.join(dir, entry.name);
+                    if (entry.isDirectory()) {
+                        findFilesRecursively(fullPath);
+                    } else if (entry.name.endsWith(fileExt)) {
+                        foundFiles.push(fullPath);
+                    }
+                }
+            } catch (error) {
+                console.error(`Error scanning directory ${dir}:`, error);
+            }
+        };
+
+        const preferredLocations = [
+            ...(this._buildFolder ? [path.join(rootPath, this._buildFolder)] : []),
+            path.join(rootPath, 'build'),
+            path.join(rootPath, 'Release'),
+            path.join(rootPath, 'Debug'),
+            path.join(rootPath, 'release'),
+            path.join(rootPath, 'debug'),
+            path.join(rootPath, 'out'),
+            path.join(rootPath, 'output')
+        ].filter(folder => {
+            try {
+                return folder && fs.existsSync(folder);
+            } catch {
+                return false;
+            }
+        });
+
+        // Search preferred locations first
+        for (const location of preferredLocations) {
+            findFilesRecursively(location);
+        }
+
+        // Search entire project if not found
+        if (foundFiles.length === 0) {
+            findFilesRecursively(rootPath);
+        }
+
+        return this.selectBestFile(foundFiles, fileExt);
+    }
+
+    private async selectBestFile(files: string[], fileExt: string): Promise<string> {
+        if (files.length === 0) {
+            return "";
+        }
+        if (files.length === 1) {
+            return files[0];
+        }
+
+        // Auto-select by priority
+        const prioritized = files.sort((a, b) => {
+            const priority = (path: string) => {
+                if (path.includes('Release')) {return 3;}
+                if (path.includes('Debug')) {return 2;}
+                if (path.includes('build')) {return 1;}
+                return 0;
+            };
+            return priority(b) - priority(a);
+        });
+
+        // Offer interactive selection if multiple high-priority files exist
+        if (prioritized.filter(f => f.includes('Release') || f.includes('Debug')).length > 1) {
+            return this.askUserToSelectFile(prioritized, fileExt);
+        }
+
+        return prioritized[0];
+    }
+    
+    private async askUserToSelectFile(files: string[], fileExt: string): Promise<string> {
+        const items = files.map(file => ({
+            label: path.basename(file),
+            description: path.dirname(file),
+            detail: file,
+            filePath: file
+        }));
+
+        const selected = await vscode.window.showQuickPick(items, {
+            placeHolder: `Multiple ${fileExt} files found. Select the correct one:`,
+            matchOnDescription: true,
+            matchOnDetail: true
+        });
+
+        return selected?.filePath || "";
+    }
+
     private parseMapAndElfFile(mapFilePath: string, elfFilePath: string): Region[] {
-        const regions:Region[] = [];
-
+        const regions: Region[] = [];
         const regionRegex = /^\s*(\w+)\s+(0x[\da-fA-F]+)\s+(0x[\da-fA-F]+)\s+\w+/;
-
         const sectionRegex = /^\s*([\d]+)\s+([\.\w]+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+/;
         const allocRegex = /\bALLOC\b/;
-
         const symbolRegex = /^([0-9A-Fa-f]+)\s+([0-9A-Fa-f]+)?\s*([a-zA-Z]+)\s+([\S]+)\s*([\S]*)?\s*/;
         const pathRegex = /(.*):(\d+)$/;
 
         let isRegion = false;
 
-        //parsing MAP
+        // Parse MAP file for memory regions
         const content = fs.readFileSync(mapFilePath, 'utf8');
         const lines = content.split('\n');
         for (const line of lines) {
@@ -167,9 +253,9 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                 break;
             }
             
-            if(isRegion) {
+            if (isRegion) {
                 const match = regionRegex.exec(line);
-                if(match) {
+                if (match) {
                     const [, name, startAddress, length] = match;
                     regions.push({
                         name,
@@ -181,31 +267,32 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                 }
             }
         }
-        //parsing OBJDUMP ELF
+
+        // Parse ELF file sections using objdump
         try {
             const result = cp.spawnSync('arm-none-eabi-objdump', ['-h', elfFilePath]);
             if (result.error) {
-                console.error('Error executing command:', result.error);
+                console.error('Error executing objdump:', result.error);
             } else {
                 const lines = result.stdout.toString().split('\n');
                 let prevLine: string = "";
                 for (const line of lines) {
                     const allocMatch = allocRegex.exec(line);
-                    if(!allocMatch) {
+                    if (!allocMatch) {
                         prevLine = line;
                         continue;
                     }
                     const match = sectionRegex.exec(prevLine);
-                    if(!match) { continue;}
+                    if (!match) { continue; }
                     const [, , name, size, address, load] = match;
                     const sectionStart = parseInt(address, 16);
                     const sectionSize = parseInt(size, 16);
-                    if(sectionSize === 0) { continue; }
+                    if (sectionSize === 0) { continue; }
                     const sectionLoadStart = parseInt(load, 16);
-                    for(const region of regions) {
+                    for (const region of regions) {
                         const regionStart = region.startAddress;
                         const regionEnd = regionStart + region.size;
-                        if(sectionStart >= regionStart && sectionStart < regionEnd) {
+                        if (sectionStart >= regionStart && sectionStart < regionEnd) {
                             region.sections.push({
                                 name,
                                 startAddress: sectionStart,
@@ -216,7 +303,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                             region.used += sectionSize;
                             continue;
                         }
-                        if(sectionLoadStart >= regionStart && sectionLoadStart < regionEnd && name === '.data') {
+                        if (sectionLoadStart >= regionStart && sectionLoadStart < regionEnd && name === '.data') {
                             region.sections.push({
                                 name,
                                 startAddress: sectionLoadStart,
@@ -227,44 +314,41 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                             region.used += sectionSize;
                         }
                     }
-                    
                 }
             }
         } catch (error) {
-            console.error('error', error);
+            console.error('Error parsing ELF sections:', error);
         }
-        //parsing NM ELF
+
+        // Parse ELF symbols using nm
         try {
             const result = cp.spawnSync('arm-none-eabi-nm', ['-C', '-S', '-n', '-l', '--defined-only', elfFilePath]);
             if (result.error) {
-                console.error('Error executing command:', result.error);
+                console.error('Error executing nm:', result.error);
             } else {
                 const lines = result.stdout.toString().split('\n');
                 for (const line of lines) {
                     const match = symbolRegex.exec(line);
-                    if(!match) { continue;}
+                    if (!match) { continue; }
                     const [, address, size, type, name, path] = match;
                     const symbolStart = parseInt(address, 16);
-                    const symbolSize = Number.isNaN(parseInt(size, 16))? 0 : parseInt(size, 16);
-                    const pathMatch = pathRegex.exec(path);
+                    const symbolSize = Number.isNaN(parseInt(size, 16)) ? 0 : parseInt(size, 16);
+                    const pathMatch = pathRegex.exec(path || "");
                     let filePath: string = "";
                     let fileRow: number = 0;
-                    if(!pathMatch) { 
-                        filePath = "";
-                        fileRow = 0;
-                    } else {
-                        const [, filePathStr, fileRowStr] = pathMatch;
-                        filePath = filePathStr;
+                    if (pathMatch) {
+                        filePath = pathMatch[1];
+                        const fileRowStr = pathMatch[2];
                         fileRow = parseInt(fileRowStr, 10);
                     }
-                    for(const region of regions) {
+                    for (const region of regions) {
                         const regionStart = region.startAddress;
                         const regionEnd = regionStart + region.size;
-                        if(symbolStart < regionStart || symbolStart >= regionEnd) {continue;}
-                        for(const section of region.sections) {
+                        if (symbolStart < regionStart || symbolStart >= regionEnd) { continue; }
+                        for (const section of region.sections) {
                             const sectionStart = section.startAddress;
                             const sectionEnd = sectionStart + section.size;
-                            if(symbolStart < sectionStart || symbolStart >= sectionEnd) {continue;}
+                            if (symbolStart < sectionStart || symbolStart >= sectionEnd) { continue; }
                             section.symbols.push({
                                 name: name,
                                 startAddress: symbolStart,
@@ -278,12 +362,13 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                 }
             }
         } catch (error) {
-            console.error('error', error);
+            console.error('Error parsing ELF symbols:', error);
         }
+
         return regions;
     }
 
-    private async openFileAtLine(filePath: string, lineNumber: number) {
+    private async openFileAtLine(filePath: string, lineNumber: number): Promise<void> {
         try {
             const fileUri = vscode.Uri.file(filePath);
             const document = await vscode.workspace.openTextDocument(fileUri);
@@ -295,11 +380,11 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                 vscode.TextEditorRevealType.InCenter
             );
         } catch (error) {
-            vscode.window.showErrorMessage(`File opening error: ${filePath}`);
+            vscode.window.showErrorMessage(`Could not open file: ${filePath}`);
         }
     }
 
-    private getHtmlContent(webview: vscode.Webview, elfFilePath: string|null): string {
+    private getHtmlContent(webview: vscode.Webview): string {
         const icon1Uri = webview.asWebviewUri(
             vscode.Uri.joinPath(this._context.extensionUri, 'resources', '1.png')
         );
@@ -309,6 +394,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         const icon3Uri = webview.asWebviewUri(
             vscode.Uri.joinPath(this._context.extensionUri, 'resources', '3.png')
         );
+
         return `
         <!DOCTYPE html>
         <html lang="en">
@@ -317,45 +403,39 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Build Analyzer</title>
             <style>
-            table.gray {
-                background-color: var(--vscode-editor-background);
-                foreground-color: var(--vscode-editor-foreground);
-                font-family: var(--vscode-editor-font-family, Arial, sans-serif);
-                width: 100%;
-                text-align: left;
-                border-collapse: collapse;
+                table.gray {
+                    background-color: var(--vscode-editor-background);
+                    color: var(--vscode-editor-foreground);
+                    font-family: var(--vscode-editor-font-family);
+                    width: 100%;
+                    text-align: left;
+                    border-collapse: collapse;
                 }
                 table.gray td, table.gray th {
-                border: 1px solid var(--highlight-color);
-                padding: 3px 2px;
+                    border: 1px solid var(--highlight-color);
+                    padding: 3px 2px;
                 }
                 table.gray tbody td {
-                font-size: 13px;
+                    font-size: 13px;
                 }
                 table.gray thead {
-                background: var(--highlight-color);
-                border-bottom: 2px solid var(--highlight-color);
+                    background: var(--highlight-color);
+                    border-bottom: 2px solid var(--highlight-color);
                 }
                 table.gray thead th {
-                font-size: 15px;
-                font-weight: bold;
-                border-left: 2px solid var(--highlight-color);
+                    font-size: 15px;
+                    font-weight: bold;
+                    border-left: 2px solid var(--highlight-color);
                 }
                 table.gray thead th:first-child {
-                border-left: none;
-                }
-                table.gray tfoot td {
-                font-size: 14px;
-                }
-                table.gray tfoot .links {
-                text-align: right;
+                    border-left: none;
                 }
                 #regionsHead td {
-                text-align: center;
+                    text-align: center;
                 }
                 #regionsBody td {
-                padding-left: 5px;
-                padding-right: 5px;
+                    padding-left: 5px;
+                    padding-right: 5px;
                 }
                 .bar { 
                     background-color: var(--vscode-editorWidget-border); 
@@ -363,55 +443,31 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                     height: 100%;
                     display: inline-block;
                 } 
-                .node {
-                    margin-left: 20px;
-                }
-                .toggleRow {
-                    display: flex;
-                    align-items: center;
-                    cursor: pointer;
-                    user-select: none;
-                }
                 .toggle {
                     cursor: pointer;
                     display: inline-block;
                     width: 20px;
                     user-select: none;
                 }
-                .children.hidden {
-                    display: none;
-                }
-        </style>
+            </style>
         </head>
         <body>
-        <table id="regionsTable">
-            <thead id="regionsHead">
-                <tr>
-                    <td></td>
-                    <td>Name</td>
-                    <td>Address</td>
-                    <td>Size</td>
-                    <td>Notes</td>
-                </tr>
-            </thead>
-            <tbody id="regionsBody">
-            </tbody>
-        </table>
-			<script>
+            <table id="regionsTable">
+                <thead id="regionsHead">
+                    <tr>
+                        <td></td>
+                        <td>Name</td>
+                        <td>Address</td>
+                        <td>Size</td>
+                        <td>Notes</td>
+                    </tr>
+                </thead>
+                <tbody id="regionsBody">
+                </tbody>
+            </table>
+            <script>
                 const vscode = acquireVsCodeApi();
-                window.addEventListener('DOMContentLoaded', () => {
-					vscode.postMessage({ command: 'parseMapFile' });
-                });
-				window.addEventListener('message', (event) => {
-					const message = event.data;
-					if (message.command === 'showMapData') {
-                        fillTableRegions(message.data);
-                    }
-					if (message.command === 'resetMapData') {
-                        resetTableRegions();
-                    }
-				});
-
+                
                 function formatBytes(bytes, decimals = 2) {
                     if (bytes <= 0) return '0 B';
                     const k = 1024;
@@ -422,15 +478,14 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                 }
 
                 function resetTableRegions() {
-                    const tableBody = document.getElementById('regionsBody');
-                    tableBody.innerHTML = '';
+                    document.getElementById('regionsBody').innerHTML = '';
                 }
                     
                 function fillTableRegions(regions) {
                     const tableBody = document.getElementById('regionsBody');
                     tableBody.innerHTML = '';
 
-                    id = 0;
+                    let id = 0;
 
                     regions.forEach(region => {
                         id++;
@@ -441,29 +496,32 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                         tableTr.className = 'toggleTr level-1';
                         tableTr.setAttribute('data-level', '1');
                         tableTr.setAttribute('data-id', regionId);
+                        
                         const tableTd1 = document.createElement('td');
-
                         const plus = document.createElement('span');
                         plus.className = 'toggle';
-                        plus.textContent = \`+\`;
+                        plus.textContent = '+';
                         tableTd1.appendChild(plus);
                         
                         const bar = document.createElement('div');
                         bar.className = 'bar';
                         const progress = document.createElement('div');
-                        if(percent > 95) {
-                            progress.setAttribute('style', \`width: \${percent}%; background-color: var(--vscode-minimap-errorHighlight); height: 100%;\`);
-                        } else if(percent > 75) {
-                            progress.setAttribute('style', \`width: \${percent}%; background-color: var(--vscode-minimap-warningHighlight); height: 100%;\`);
-                        } else {
-                            progress.setAttribute('style', \`width: \${percent}%; background-color: var(--vscode-minimap-infoHighlight); height: 100%;\`);
-                        }
+                        progress.setAttribute('style', \`
+                            width: \${percent}%; 
+                            background-color: \${percent > 95 ? 'var(--vscode-minimap-errorHighlight)' : 
+                                             percent > 75 ? 'var(--vscode-minimap-warningHighlight)' : 
+                                             'var(--vscode-minimap-infoHighlight)'}; 
+                            height: 100%;
+                            color: \${percent > 50 ? 'white' : 'black'};
+                            text-align: center;
+                            font-size: 12px;
+                            line-height: 1.5;
+                        \`);
                         progress.textContent = \`\${percent.toFixed(2)}%\`;
                         bar.appendChild(progress);
                         tableTd1.appendChild(bar);
 
                         const tableTd2 = document.createElement('td');
-
                         const img = document.createElement('img');
                         img.src = '${icon1Uri}';
                         img.alt = 'Icon';
@@ -472,24 +530,16 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                         img.style.verticalAlign = 'middle';
                         img.style.marginRight = '5px';
                         tableTd2.appendChild(img); 
-
-                        const textNodeName = document.createTextNode(\` \${region.name} \`);
-                        tableTd2.appendChild(textNodeName); 
+                        tableTd2.appendChild(document.createTextNode(\` \${region.name} \`));
 
                         const tableTd3 = document.createElement('td');
-
-                        const textNodeAddress = document.createTextNode(\` 0x\${region.startAddress.toString(16).padStart(8,'0')} \`);
-                        tableTd3.appendChild(textNodeAddress); 
+                        tableTd3.appendChild(document.createTextNode(\`0x\${region.startAddress.toString(16).padStart(8,'0')}\`));
 
                         const tableTd4 = document.createElement('td');
-
-                        const textNodeSize = document.createTextNode(\` \${formatBytes(region.size)} \`);
-                        tableTd4.appendChild(textNodeSize); 
+                        tableTd4.appendChild(document.createTextNode(formatBytes(region.size)));
 
                         const tableTd5 = document.createElement('td');
-
-                        const textNodeFreeSize = document.createTextNode(\` \${formatBytes(region.size-region.used)} free \`);
-                        tableTd5.appendChild(textNodeFreeSize); 
+                        tableTd5.appendChild(document.createTextNode(\`\${formatBytes(region.size-region.used)} free\`));
                         
                         tableTr.appendChild(tableTd1);
                         tableTr.appendChild(tableTd2);
@@ -500,7 +550,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
                         region.sections.forEach(section => {
                             id++;
-                            sectionId = id;
+                            const sectionId = id;
                             const sectionTr = document.createElement('tr');
                             sectionTr.className = 'toggleTr level-2';
                             sectionTr.setAttribute('data-level', '2');
@@ -509,14 +559,12 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                             sectionTr.style.display = 'none';
 
                             const sectionTd1 = document.createElement('td');
-                            
                             const plus = document.createElement('span');
                             plus.className = 'toggle';
-                            plus.textContent = \`+\`;
+                            plus.textContent = '+';
                             sectionTd1.appendChild(plus);
 
                             const sectionTd2 = document.createElement('td');
-
                             const img = document.createElement('img');
                             img.src = '${icon2Uri}';
                             img.alt = 'Icon';
@@ -525,44 +573,36 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                             img.style.verticalAlign = 'middle';
                             img.style.marginRight = '5px';
                             sectionTd2.appendChild(img); 
-
-                            const sectionName = document.createTextNode(\` \${section.name} \`);
-                            sectionTd2.appendChild(sectionName); 
-                            sectionTd2.setAttribute('style', \`padding-left: 15px;\`);
+                            sectionTd2.appendChild(document.createTextNode(\` \${section.name} \`));
+                            sectionTd2.style.paddingLeft = '15px';
 
                             const sectionTd3 = document.createElement('td');
-
-                            const sectionAddress = document.createTextNode(\` 0x\${section.startAddress.toString(16).padStart(8,'0')} \`);
-                            sectionTd3.appendChild(sectionAddress); 
+                            sectionTd3.appendChild(document.createTextNode(\`0x\${section.startAddress.toString(16).padStart(8,'0')}\`));
 
                             const sectionTd4 = document.createElement('td');
-
-                            const sectionSize = document.createTextNode(\` \${formatBytes(section.size)} \`);
-                            sectionTd4.appendChild(sectionSize); 
+                            sectionTd4.appendChild(document.createTextNode(formatBytes(section.size)));
 
                             const sectionTd5 = document.createElement('td');
-
                             
                             sectionTr.appendChild(sectionTd1);
                             sectionTr.appendChild(sectionTd2);
                             sectionTr.appendChild(sectionTd3);
                             sectionTr.appendChild(sectionTd4);
                             sectionTr.appendChild(sectionTd5);
-
                             tableBody.appendChild(sectionTr);
+
                             section.symbols.forEach(symbol => {
                                 id++;
-                                pointId = id;
                                 const pointTr = document.createElement('tr');
                                 pointTr.className = 'toggleTr level-3';
                                 pointTr.setAttribute('data-level', '3');
-                                pointTr.setAttribute('data-id', pointId);
+                                pointTr.setAttribute('data-id', id);
                                 pointTr.setAttribute('data-parent', sectionId);
                                 pointTr.style.display = 'none';
                                 
                                 const pointTd1 = document.createElement('td');
                                 const pointTd2 = document.createElement('td');
-                                pointTd2.setAttribute('title', \`\${symbol.path} : \${symbol.row}\`);
+                                pointTd2.setAttribute('title', \`\${symbol.path}:\${symbol.row}\`);
 
                                 const img = document.createElement('img');
                                 img.src = '${icon3Uri}';
@@ -573,31 +613,24 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                                 img.style.marginRight = '5px';
                                 pointTd2.appendChild(img); 
 
-                                if(symbol.path == '') {
-                                    const pointName = document.createTextNode(\` \${symbol.name} \`);
-                                    pointTd2.appendChild(pointName);
+                                if (symbol.path === '') {
+                                    pointTd2.appendChild(document.createTextNode(\` \${symbol.name} \`));
                                 } else {
                                     const link = document.createElement('a');
                                     link.className = 'source-link';
-                                    link.setAttribute('href', '#');
-                                    link.setAttribute('data-file', \`\${symbol.path}\`);
-                                    link.setAttribute('data-line', \`\${symbol.row}\`);
-                                    const pointName = document.createTextNode(\` \${symbol.name} \`);
-                                    link.appendChild(pointName);
+                                    link.href = '#';
+                                    link.dataset.file = symbol.path;
+                                    link.dataset.line = symbol.row.toString();
+                                    link.appendChild(document.createTextNode(\` \${symbol.name} \`));
                                     pointTd2.appendChild(link);
                                 }
-
-                                pointTd2.setAttribute('style', \`padding-left: 25px;\`);
+                                pointTd2.style.paddingLeft = '25px';
 
                                 const pointTd3 = document.createElement('td');
-
-                                const pointAddress = document.createTextNode(\` 0x\${symbol.startAddress.toString(16).padStart(8,'0')} \`);
-                                pointTd3.appendChild(pointAddress); 
+                                pointTd3.appendChild(document.createTextNode(\`0x\${symbol.startAddress.toString(16).padStart(8,'0')}\`));
 
                                 const pointTd4 = document.createElement('td');
-
-                                const pointSize = document.createTextNode(\` \${symbol.size} B\`);
-                                pointTd4.appendChild(pointSize); 
+                                pointTd4.appendChild(document.createTextNode(\`\${symbol.size} B\`));
 
                                 const pointTd5 = document.createElement('td');                                
 
@@ -606,85 +639,88 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                                 pointTr.appendChild(pointTd3);
                                 pointTr.appendChild(pointTd4);
                                 pointTr.appendChild(pointTd5);
-
                                 tableBody.appendChild(pointTr);
                             });
                         });
                     });
                 }
-                document.addEventListener("DOMContentLoaded", () => {
-                    
-                    function toggleNode(toggleElement) {
-                        const children = toggleElement.closest(".node").querySelector(".children");
-                        if (children) {
-                            children.classList.toggle("hidden");
-                            toggleElement.textContent = children.classList.contains("hidden") ? "+" : "-";
-                        }
-                    }
 
-                    const regionsTable = document.getElementById("regionsTable");
-                
-                    regionsTable.addEventListener("dblclick", (e) => {
-                        const tr = e.target.closest('tr');
-                        if (!tr) return;
+                document.addEventListener('DOMContentLoaded', () => {
+                    vscode.postMessage({ command: 'parseMapFile' });
+                });
 
+                document.getElementById('regionsTable').addEventListener('click', (e) => {
+                    const toggleSpan = e.target.closest('.toggle');
+                    if (toggleSpan) {
+                        const tr = toggleSpan.closest('tr');
                         const level = parseInt(tr.getAttribute('data-level'), 10);
                         const parentId = tr.getAttribute('data-id');
 
-                        function toggleVisibility(parentId) {\
-                            const childRows = document.querySelectorAll(\`tr[data-parent="\${parentId}"]\`);
-                            childRows.forEach(child => {\
-                                child.style.display = child.style.display === 'none' ? '' : 'none';\
-                                const childId = child.getAttribute('data-id');
-                                const childLevel = parseInt(child.getAttribute('data-level'), 10);
-                                if (child.style.display === 'none' && childLevel === 2) { \
-                                    const childChildRows = document.querySelectorAll(\`tr[data-parent="\${childId}"]\`);
-                                    childChildRows.forEach(c => {
-                                        if(c.style.display !== 'none') c.style.display = 'none';
-                                    });
-                                }
-                            });
-                        }
-                        
-                        const toggleSpan = tr.querySelector('.toggle');
-                        if (toggleSpan) {
-                            toggleSpan.textContent = toggleSpan.textContent === '+' ? '−' : '+';
-                        }
-                        toggleVisibility(parentId);
-                    });
+                        const childRows = document.querySelectorAll(\`tr[data-parent="\${parentId}"]\`);
+                        childRows.forEach(child => {
+                            child.style.display = child.style.display === 'none' ? '' : 'none';
+                            const childId = child.getAttribute('data-id');
+                            const childLevel = parseInt(child.getAttribute('data-level'), 10);
+                            if (child.style.display === 'none' && childLevel === 2) {
+                                const grandChildRows = document.querySelectorAll(\`tr[data-parent="\${childId}"]\`);
+                                grandChildRows.forEach(grandChild => {
+                                    if (grandChild.style.display !== 'none') {
+                                        grandChild.style.display = 'none';
+                                    }
+                                });
+                            }
+                        });
 
-                    regionsTable.addEventListener('click', (event) => {
-                        if (event.target.classList.contains('source-link')) {
-                            event.preventDefault();
+                        toggleSpan.textContent = toggleSpan.textContent === '+' ? '−' : '+';
+                    }
 
-                            const filePath = event.target.dataset.file;
-                            const lineNumber = parseInt(event.target.dataset.line, 10);
-
-                            vscode.postMessage({
-                                command: 'openFile',
-                                filePath: filePath,
-                                lineNumber: lineNumber
-                            });
-
-                            event.stopPropagation();
-                        }
-                    });
+                    const sourceLink = e.target.closest('.source-link');
+                    if (sourceLink) {
+                        e.preventDefault();
+                        vscode.postMessage({
+                            command: 'openFile',
+                            filePath: sourceLink.dataset.file,
+                            lineNumber: parseInt(sourceLink.dataset.line, 10)
+                        });
+                    }
                 });
-			</script>
+
+                window.addEventListener('message', (event) => {
+                    const message = event.data;
+                    if (message.command === 'showMapData') {
+                        fillTableRegions(message.data);
+                    }
+                    if (message.command === 'resetMapData') {
+                        resetTableRegions();
+                    }
+                });
+            </script>
         </body>
-        </html>
-        `;
+        </html>`;
     }
 }
 
-export function activate(context: vscode.ExtensionContext) {
-	context.subscriptions.push(
+export function activate(context: vscode.ExtensionContext): void {
+    const provider = new BuildAnalyzerProvider(context);
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('stm32BuildAnalyzerEnhanced.openTab', () => {
+            // Otwórz panel analizatora
+            vscode.commands.executeCommand('workbench.view.extension.buildAnalyzerEnhancedPanel');
+        }),
+        
+        vscode.commands.registerCommand('stm32BuildAnalyzerEnhanced.refresh', () => {
+            provider.updateFilePaths();
+        })
+    );
+
+
+    context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
-            "buildAnalyzer",
-            new BuildAnalyzerProvider(context)
+            "buildAnalyzerEnhanced",
+            provider
         )
     );
 }
 
-export function deactivate() {}
-
+export function deactivate(): void {}
