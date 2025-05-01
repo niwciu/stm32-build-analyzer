@@ -2,7 +2,7 @@
   "name": "stm32-build-analyzer-enhanced",
   "displayName": "STM32 Build Analyzer (Enhanced)", 
   "description": "STM32 Build Analyzer for VSCode - Fork of ATwice291/stm32-build-analyzer with additional features...",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "niwciu",
   "license": "MIT",
   "engines": {
@@ -18,24 +18,23 @@
   "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
+    "icon": {
+      "light": "images/icon.png",
+      "dark": "images/icon.png"
+    },
     "commands": [
       {
         "command": "stm32BuildAnalyzerEnhanced.openTab",
-        "title": "STM32 Build Analyzer (Enhanced)"
+        "title": "STM32 Build Analyzer"
       },
       {
         "command": "stm32BuildAnalyzerEnhanced.refresh",
-        "title": "Refresh STM32 Build Analyzer (Enhanced) Paths"
+        "title": "STM32 Build Analyzer Refresh Paths"
       }
     ],
     "configuration": {
       "title": "STM32 Build Analyzer (Enhanced)",
       "properties": {
-        "stm32BuildAnalyzerEnhanced.buildFolder": {
-          "type": "string",
-          "default": "",
-          "description": "Path to the build folder (relative to workspace or absolute)"
-        },
         "stm32BuildAnalyzerEnhanced.mapFilePath": {
           "type": "string",
           "default": "",
@@ -48,12 +47,13 @@
         }
       }
     },
+    
     "viewsContainers": {
       "panel": [
         {
           "id": "buildAnalyzerEnhancedPanel",
-          "title": "Build Analyzer (Enhanced)",
-          "icon": "resources/icon.png"
+          "title": "STM32 Build Analyzer",
+          "icon": "images/icon.png"
         }
       ]
     },
@@ -61,7 +61,7 @@
       "buildAnalyzerEnhancedPanel": [
         {
           "id": "buildAnalyzerEnhanced",
-          "name": "Build Analyzer (Enhanced)",
+          "name": "STM32 Build Analyzer",
           "type": "webview"
         }
       ]

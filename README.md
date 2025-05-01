@@ -1,60 +1,110 @@
-# STM32 Build Analyzer (Enhanced)
+# STM32 Build Analyzer (Enhanced) 🚀  
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![VS Code](https://img.shields.io/badge/VS%20Code-Extension-blue?logo=visualstudiocode)](#)
 
-**Community-maintained fork of [ATwice291/stm32-build-analyzer](https://github.com/ATwice291/stm32-build-analyzer)**  
-*Original version by Aleksei Perevozchikov (ATwice291), licensed under MIT.*
+> Visual memory analyzer for STM32 projects – works with `.map` and `.elf` files, no matter what toolchain or build system you use.
 
-![Main view](images/2.JPG)
+![Main UI View](images/2.JPG)
 
-## Key Improvements in This Fork
+---
 
-✅ **Removed CMake dependency** - Works with any build system  
-✅ **Custom build folder support** - Configure your build directory in settings  
-✅ **Improved file discovery** - Better handling of .map/.elf files  
-✅ **Optimized UI** - Enhanced memory visualization  
+## ❓ Why This Fork?
 
-## Features
+The original version was depandet with cmake-tool extension.  
+This fork removes that dependency, adds broader file handling, and enhances the UI for developers using CubeIDE, Makefiles, or custom setups.
 
-- Memory region analysis from linker map files
-- Detailed section/symbol breakdown with source code links
-- Visual memory usage indicators (color-coded thresholds)
-- Support for all STM32 projects (not limited to CMake)
-- ARM toolchain integration (`arm-none-eabi-objdump`, `arm-none-eabi-nm`)
+---
 
-## Installation
+## 🚀 Key Improvements in This Fork
 
-1. Install from [VS Code Marketplace](LINK_TO_YOUR_EXTENSION)  
-   or  
+✅ **Removed CMake dependency** – Works with any build system (Makefile, CubeIDE, etc.)  
+✅ **Custom build folder support** – Easily set via UI button or command  
+✅ **Improved file discovery** – More robust handling of `.map` and `.elf` files  
+✅ **Optimized UI** – Visual memory usage indicators and new interactive controls  
+
+---
+
+## 🔍 Features
+
+- Memory region analysis using `.map` and `.elf` files
+- Detailed breakdown of memory sections and symbols
+- Clickable links from symbols to source files
+- Visual panel with color-coded usage (RAM, Flash)
+- ARM toolchain integration (`arm-none-eabi-objdump`, `nm`)
+- Compatible with any STM32 build system
+
+---
+
+## 📦 Installation
+
+### From VS Code Marketplace (Coming soon)
+
+📥 [Marketplace link placeholder](https://marketplace.visualstudio.com/items?itemName=niwciu.stm32-build-analyzer-enhanced#)
+
+### Manual Installation
+
+#### Requirements
+
+1. Node.js installed  
+2. npm installed  
+3. `vsce` installed:
    ```bash
-   code --install-extension stm32-build-analyzer-enhanced-*.vsix
+   npm install -g @vscode/vsce
+   ```
 
-## Features
+#### Build and Install manual
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/niwciu/stm32-build-analyzer.git
+   cd stm32-build-analyzer
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Build the .vsix package using vsce:
+   ```bash
+   vsce package
+   ```
+4. This will generate a file like: `stm32-build-analyzer-enhanced-1.1.0.vsix`
 
-* Custom bottom-panel webview.
-* Memory region analysis from .map files.
-* Displays detailed memory usage, including sections and their sizes.
-* Compatible with any STM32-based project.
-* Symbols have links to source code.
+5. Install the extension in VS Code: 
+   ```bash
+   code --install-extension stm32-build-analyzer-enhanced-1.1.0.vsix
+   ```
 
 
-### 1.0.0
+---
 
-Initial STM32 Build Analyzer plugin release
+## 🛠 Usage
 
-### 1.0.2
+- Open the Command Palette (`Ctrl+Shift+P`) and run:
+  - `STM32 Build Analyzer` – opens the main view
+  - `STM32 Build Analyzer Refresh Paths` – re-detects build output folder
+- Analyzer view updates automatically when build output files change.
 
-Added icons and indents
+---
 
-### 1.0.3
+## 📜 Changelog
 
-- arm-none-eabi-objdump and arm-none-eabi-nm are used to get more accurate results
-- symbols now have links to source code
+See [CHANGELOG.md](CHANGELOG.md) for full version history.
 
-### 1.0.4
-- fixed a bug causing incorrect operations with sectors at address 0x00000000 (e.g., ITCMRAM)
+---
 
-### 1.0.5
-- the plugin worked only with the 'Debug' build type - fixed. now the plugin gets the build type name from the CMake Tools extension
+## 🤝 Contributing
 
-## License
+Pull requests are welcome!  
+If you find bugs or want to request features, feel free to [open an issue](https://github.com/niwciu/stm32-build-analyzer/issues).
 
-This extension is licensed under the [MIT License](LICENSE).
+---
+
+## ⚖️ License & Attribution
+
+This extension is licensed under the [MIT License](LICENSE).  
+Originally created by Aleksei Perevozchikov ([ATwice291](https://github.com/ATwice291))  
+Fork maintained by [niwciu](https://github.com/niwciu) with enhancements described above.
+
+---
+
+<!-- SEO note -->
+STM32 build analyzer for memory usage, symbol tracking, and map/elf inspection – compatible with Makefiles, CubeIDE, and other toolchains.

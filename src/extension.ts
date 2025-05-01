@@ -33,10 +33,26 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
     private _mapFilePath: string = "";
     private _elfFilePath: string = "";
     private _buildFolder: string = "";
+    private _fileWatcher: vscode.FileSystemWatcher | undefined;
 
     constructor(context: vscode.ExtensionContext) {
         this._context = context;
+        this.setupFileWatcher();
         this.updateFilePaths();
+    }
+
+    private setupFileWatcher(): void {
+        if (this._fileWatcher) {
+            this._fileWatcher.dispose();
+        }
+        
+        this._fileWatcher = vscode.workspace.createFileSystemWatcher('**/*.{map,elf}');
+        this._fileWatcher.onDidChange(() => {
+            if (this._mapFilePath && this._elfFilePath) {
+                this.refreshView();
+            }
+        });
+        this._context.subscriptions.push(this._fileWatcher);
     }
 
     public resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -51,113 +67,130 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
         webviewView.webview.onDidReceiveMessage(async (message) => {
             switch (message.command) {
-                case 'parseMapFile':
-                    if (this._mapFilePath && this._elfFilePath) {
-                        try {
-                            const regions = this.parseMapAndElfFile(this._mapFilePath, this._elfFilePath);
-                            webviewView.webview.postMessage({
-                                command: 'showMapData',
-                                data: regions
-                            });
-                        } catch (error) {
-                            vscode.window.showErrorMessage(`Error parsing files: ${error instanceof Error ? error.message : String(error)}`);
-                        }
-                    } else {
-                        webviewView.webview.postMessage({ command: 'resetMapData' });
-                    }
+                case 'requestRefresh':
+                    this.refreshView();
                     break;
                 case 'openFile':
                     await this.openFileAtLine(message.filePath, message.lineNumber);
                     break;
+                case 'refreshPaths':
+                    await vscode.commands.executeCommand('stm32BuildAnalyzerEnhanced.refresh');
+                    break;
             }
         });
 
-        if (this._mapFilePath && this._elfFilePath) {
-            this.parseAndSendData(webviewView);
-        }
+        this.refreshView();
     }
 
-    private async parseAndSendData(webviewView: vscode.WebviewView) {
-        try {
-            const regions = this.parseMapAndElfFile(this._mapFilePath, this._elfFilePath);
-            webviewView.webview.postMessage({
-                command: 'showMapData',
-                data: regions
-            });
-        } catch (error) {
-            vscode.window.showErrorMessage(`Failed to parse files: ${error instanceof Error ? error.message : String(error)}`);
+    private refreshView(): void {
+        if (this._view && this._mapFilePath && this._elfFilePath) {
+            try {
+                const regions = this.parseMapAndElfFile(this._mapFilePath, this._elfFilePath);
+                this._view.webview.postMessage({
+                    command: 'showMapData',
+                    data: regions
+                });
+            } catch (error) {
+                console.error('Error refreshing view:', error);
+            }
         }
     }
 
     public async updateFilePaths(): Promise<void> {
         const config = vscode.workspace.getConfiguration('stm32BuildAnalyzer');
-        this._buildFolder = config.get<string>('buildFolder') || "";
 
         try {
             const customMapPath = config.get<string>('mapFilePath');
             const customElfPath = config.get<string>('elfFilePath');
 
-            this._mapFilePath = customMapPath && fs.existsSync(customMapPath) 
-                ? customMapPath 
-                : await this.findValidFile('.map');
-
-            this._elfFilePath = customElfPath && fs.existsSync(customElfPath)
-                ? customElfPath
-                : await this.findValidFile('.elf');
-
-            if (!this._mapFilePath || !this._elfFilePath) {
-                vscode.window.showErrorMessage("No .map or .elf files found! Check configuration.");
-            } else if (this._view) {
-                this._view.webview.postMessage({ command: 'parseMapFile' });
+            // Jeśli ścieżki są ustawione ręcznie, użyj ich
+            if (customMapPath && customElfPath && fs.existsSync(customMapPath) && fs.existsSync(customElfPath)) {
+                this._mapFilePath = customMapPath;
+                this._elfFilePath = customElfPath;
+                this.refreshView();
+                return;
             }
+
+            // Znajdź foldery zawierające zarówno .map jak i .elf
+            const buildFolders = await this.findBuildFolders();
+
+            if (buildFolders.length === 0) {
+                vscode.window.showErrorMessage("No folders found containing both .map and .elf files!");
+                return;
+            }
+
+            let selectedFolder = buildFolders[0];
+
+            // Jeśli wiele folderów, zapytaj użytkownika
+            if (buildFolders.length > 1) {
+                const items = buildFolders.map(folder => ({
+                    label: path.basename(folder),
+                    description: folder,
+                    folderPath: folder
+                }));
+
+                const selected = await vscode.window.showQuickPick(items, {
+                    placeHolder: 'Multiple build folders found. Select one:',
+                    matchOnDescription: true
+                });
+
+                if (!selected) {return;}
+                selectedFolder = selected.folderPath;
+            }
+
+            // Znajdź pliki w wybranym folderze
+            const [mapFile, elfFile] = await Promise.all([
+                this.findFileInFolder('.map', selectedFolder),
+                this.findFileInFolder('.elf', selectedFolder)
+            ]);
+
+            if (mapFile && elfFile) {
+                this._mapFilePath = mapFile;
+                this._elfFilePath = elfFile;
+                this.refreshView();
+            } else {
+                vscode.window.showErrorMessage(`No .map or .elf files found in selected folder: ${selectedFolder}`);
+            }
+
         } catch (error) {
             vscode.window.showErrorMessage(`Error updating file paths: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 
-    private async findValidFile(fileExt: string): Promise<string> {
-        const filePath = await this.findFile(fileExt);
-        if (!filePath) {return "";}
-        
-        try {
-            // Basic file validation
-            fs.accessSync(filePath, fs.constants.R_OK);
-            if (fileExt === '.map' && fs.readFileSync(filePath, 'utf8').length === 0) {
-                throw new Error("Map file is empty");
-            }
-            return filePath;
-        } catch (error) {
-            vscode.window.showWarningMessage(`Invalid ${fileExt} file: ${path.basename(filePath)}`);
-            return "";
-        }
-    }
-
-    private async findFile(fileExt: string): Promise<string> {
+    private async findBuildFolders(): Promise<string[]> {
         const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders) {
-            return "";
-        }
+        if (!workspaceFolders) {return [];}
 
         const rootPath = workspaceFolders[0].uri.fsPath;
-        const foundFiles: string[] = [];
+        const buildFolders = new Set<string>();
 
         const findFilesRecursively = (dir: string): void => {
             try {
                 const entries = fs.readdirSync(dir, { withFileTypes: true });
+                let hasMap = false;
+                let hasElf = false;
+
                 for (const entry of entries) {
                     const fullPath = path.join(dir, entry.name);
                     if (entry.isDirectory()) {
                         findFilesRecursively(fullPath);
-                    } else if (entry.name.endsWith(fileExt)) {
-                        foundFiles.push(fullPath);
+                    } else if (entry.name.endsWith('.map')) {
+                        hasMap = true;
+                    } else if (entry.name.endsWith('.elf')) {
+                        hasElf = true;
                     }
+                }
+
+                if (hasMap && hasElf) {
+                    buildFolders.add(dir);
                 }
             } catch (error) {
                 console.error(`Error scanning directory ${dir}:`, error);
             }
         };
 
-        const preferredLocations = [
+        // Najpierw sprawdź typowe lokalizacje
+        const commonLocations = [
             ...(this._buildFolder ? [path.join(rootPath, this._buildFolder)] : []),
             path.join(rootPath, 'build'),
             path.join(rootPath, 'Release'),
@@ -166,69 +199,53 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
             path.join(rootPath, 'debug'),
             path.join(rootPath, 'out'),
             path.join(rootPath, 'output')
-        ].filter(folder => {
-            try {
-                return folder && fs.existsSync(folder);
-            } catch {
-                return false;
-            }
-        });
+        ];
 
-        // Search preferred locations first
-        for (const location of preferredLocations) {
-            findFilesRecursively(location);
+        for (const location of commonLocations) {
+            if (fs.existsSync(location)) {
+                findFilesRecursively(location);
+            }
         }
 
-        // Search entire project if not found
-        if (foundFiles.length === 0) {
+        // Jeśli nie znaleziono w typowych lokalizacjach, przeszukaj cały projekt
+        if (buildFolders.size === 0) {
             findFilesRecursively(rootPath);
         }
 
-        return this.selectBestFile(foundFiles, fileExt);
+        return Array.from(buildFolders);
     }
 
-    private async selectBestFile(files: string[], fileExt: string): Promise<string> {
-        if (files.length === 0) {
+    private async findFileInFolder(fileExt: string, folderPath: string): Promise<string> {
+        try {
+            if (!fs.existsSync(folderPath)) {return "";}
+
+            const files = fs.readdirSync(folderPath);
+            const matchingFiles = files.filter(file => file.endsWith(fileExt));
+
+            if (matchingFiles.length === 0) {return "";}
+
+            // Jeśli wiele plików, wybierz najbardziej prawdopodobny
+            const prioritized = matchingFiles.sort((a, b) => {
+                if (a.includes('Release')) {return -1;}
+                if (b.includes('Release')) {return 1;}
+                if (a.includes('Debug')) {return -1;}
+                if (b.includes('Debug')) {return 1;}
+                return 0;
+            });
+
+            const filePath = path.join(folderPath, prioritized[0]);
+            
+            // Sprawdź czy plik jest poprawny
+            fs.accessSync(filePath, fs.constants.R_OK);
+            if (fileExt === '.map' && fs.readFileSync(filePath, 'utf8').length === 0) {
+                throw new Error("Map file is empty");
+            }
+            
+            return filePath;
+        } catch (error) {
+            console.error(`Error searching for ${fileExt} files in ${folderPath}:`, error);
             return "";
         }
-        if (files.length === 1) {
-            return files[0];
-        }
-
-        // Auto-select by priority
-        const prioritized = files.sort((a, b) => {
-            const priority = (path: string) => {
-                if (path.includes('Release')) {return 3;}
-                if (path.includes('Debug')) {return 2;}
-                if (path.includes('build')) {return 1;}
-                return 0;
-            };
-            return priority(b) - priority(a);
-        });
-
-        // Offer interactive selection if multiple high-priority files exist
-        if (prioritized.filter(f => f.includes('Release') || f.includes('Debug')).length > 1) {
-            return this.askUserToSelectFile(prioritized, fileExt);
-        }
-
-        return prioritized[0];
-    }
-    
-    private async askUserToSelectFile(files: string[], fileExt: string): Promise<string> {
-        const items = files.map(file => ({
-            label: path.basename(file),
-            description: path.dirname(file),
-            detail: file,
-            filePath: file
-        }));
-
-        const selected = await vscode.window.showQuickPick(items, {
-            placeHolder: `Multiple ${fileExt} files found. Select the correct one:`,
-            matchOnDescription: true,
-            matchOnDetail: true
-        });
-
-        return selected?.filePath || "";
     }
 
     private parseMapAndElfFile(mapFilePath: string, elfFilePath: string): Region[] {
@@ -415,9 +432,14 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                     border: 1px solid var(--highlight-color);
                     padding: 3px 2px;
                 }
+                table.gray td:nth-child(5),
+                table.gray td:nth-child(6) {
+                    text-align: right;
+                }
                 table.gray tbody td {
                     font-size: 13px;
                 }
+                
                 table.gray thead {
                     background: var(--highlight-color);
                     border-bottom: 2px solid var(--highlight-color);
@@ -449,9 +471,29 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                     width: 20px;
                     user-select: none;
                 }
+                #refreshButton,
+                #refreshPathsButton {
+                    padding: 5px 10px;
+                    margin-bottom: 10px;
+                    cursor: pointer;
+                    background-color: var(--vscode-button-secondaryBackground);
+                    color: var(--vscode-button-secondaryForeground);
+                    border: 1px solid var(--vscode-button-secondaryBorder);
+                    border-radius: 2px;
+                }
+
+                #refreshButton:hover,
+                #refreshPathsButton:hover {
+                    background-color: var(--vscode-button-secondaryHoverBackground);
+                }
+
             </style>
         </head>
         <body>
+            <div class="button-container">
+                <button id="refreshButton" class="button">Refresh Analyze</button>
+                <button id="refreshPathsButton" class="button">Select Build Folder</button>
+            </div>
             <table id="regionsTable">
                 <thead id="regionsHead">
                     <tr>
@@ -459,7 +501,8 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                         <td>Name</td>
                         <td>Address</td>
                         <td>Size</td>
-                        <td>Notes</td>
+                        <td>Used</td>
+                        <td>Free</td>
                     </tr>
                 </thead>
                 <tbody id="regionsBody">
@@ -539,13 +582,17 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                         tableTd4.appendChild(document.createTextNode(formatBytes(region.size)));
 
                         const tableTd5 = document.createElement('td');
-                        tableTd5.appendChild(document.createTextNode(\`\${formatBytes(region.size-region.used)} free\`));
+                        tableTd5.appendChild(document.createTextNode(formatBytes(region.used)));
+
+                        const tableTd6 = document.createElement('td');
+                        tableTd6.appendChild(document.createTextNode(formatBytes(region.size-region.used)));
                         
                         tableTr.appendChild(tableTd1);
                         tableTr.appendChild(tableTd2);
                         tableTr.appendChild(tableTd3);
                         tableTr.appendChild(tableTd4);
                         tableTr.appendChild(tableTd5);
+                        tableTr.appendChild(tableTd6);
                         tableBody.appendChild(tableTr);
 
                         region.sections.forEach(section => {
@@ -583,12 +630,14 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                             sectionTd4.appendChild(document.createTextNode(formatBytes(section.size)));
 
                             const sectionTd5 = document.createElement('td');
+                            const sectionTd6 = document.createElement('td');
                             
                             sectionTr.appendChild(sectionTd1);
                             sectionTr.appendChild(sectionTd2);
                             sectionTr.appendChild(sectionTd3);
                             sectionTr.appendChild(sectionTd4);
                             sectionTr.appendChild(sectionTd5);
+                            sectionTr.appendChild(sectionTd6);
                             tableBody.appendChild(sectionTr);
 
                             section.symbols.forEach(symbol => {
@@ -632,13 +681,15 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                                 const pointTd4 = document.createElement('td');
                                 pointTd4.appendChild(document.createTextNode(\`\${symbol.size} B\`));
 
-                                const pointTd5 = document.createElement('td');                                
+                                const pointTd5 = document.createElement('td');
+                                const pointTd6 = document.createElement('td');                                
 
                                 pointTr.appendChild(pointTd1);
                                 pointTr.appendChild(pointTd2);
                                 pointTr.appendChild(pointTd3);
                                 pointTr.appendChild(pointTd4);
                                 pointTr.appendChild(pointTd5);
+                                pointTr.appendChild(pointTd6);
                                 tableBody.appendChild(pointTr);
                             });
                         });
@@ -646,7 +697,14 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                 }
 
                 document.addEventListener('DOMContentLoaded', () => {
-                    vscode.postMessage({ command: 'parseMapFile' });
+                    vscode.postMessage({ command: 'requestRefresh' });
+                    
+                    document.getElementById('refreshButton').addEventListener('click', () => {
+                        vscode.postMessage({ command: 'requestRefresh' });
+                    });
+                    document.getElementById('refreshPathsButton').addEventListener('click', () => {
+                        vscode.postMessage({ command: 'refreshPaths' });
+                    });
                 });
 
                 document.getElementById('regionsTable').addEventListener('click', (e) => {
@@ -698,6 +756,12 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         </body>
         </html>`;
     }
+
+    dispose(): void {
+        if (this._fileWatcher) {
+            this._fileWatcher.dispose();
+        }
+    }
 }
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -708,12 +772,12 @@ export function activate(context: vscode.ExtensionContext): void {
             // Otwórz panel analizatora
             vscode.commands.executeCommand('workbench.view.extension.buildAnalyzerEnhancedPanel');
         }),
-        
+
         vscode.commands.registerCommand('stm32BuildAnalyzerEnhanced.refresh', () => {
             provider.updateFilePaths();
-        })
+        }),
+        provider
     );
-
 
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(

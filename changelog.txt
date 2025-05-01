@@ -1,0 +1,41 @@
+Kluczowe zmiany:
+
+✅ **Removed CMake dependency** - Works with any build system  
+✅ **Custom build folder support** - Configure your build directory in settings  
+✅ **Improved file discovery** - Better handling of .map/.elf files  
+
+    Dodano mechanizm automatycznego odświeżania:
+
+        FileSystemWatcher monitoruje zmiany w plikach .map/.elf
+
+        Nowa metoda refreshView() centralnie zarządza aktualizacjami
+
+    Interfejs użytkownika:
+
+        Dodano przycisk "Odśwież" w panelu Webview
+
+        Dwukierunkowa komunikacja między Webview a rozszerzeniem
+
+    Poprawa stabilności:
+
+        Lepsza obsługa błędów
+
+        Prawidłowe czyszczenie zasobów w metodzie dispose()
+
+    Zachowano wszystkie istniejące funkcje:
+
+        Parsowanie plików .map/.elf
+
+        Wyświetlanie struktury pamięci
+
+        Linki do kodu źródłowego
+
+Rozszerzenie teraz automatycznie odświeża widok w odpowiedzi na:
+
+    Zmiany w plikach konfiguracyjnych
+
+    Modyfikacje plików .map/.elf
+
+    Kliknięcie przycisku "Odśwież"
+
+    Ręczne wywołanie komendy refresh
