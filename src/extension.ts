@@ -458,6 +458,9 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                 #regionsBody td {
                     padding-left: 5px;
                     padding-right: 5px;
+                }  
+                #regionsBody td.right-align {
+                    text-align: right;
                 }
                 .bar { 
                     background-color: var(--vscode-editorWidget-border); 
@@ -579,12 +582,15 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                         tableTd3.appendChild(document.createTextNode(\`0x\${region.startAddress.toString(16).padStart(8,'0')}\`));
 
                         const tableTd4 = document.createElement('td');
+                        tableTd4.className = 'right-align';
                         tableTd4.appendChild(document.createTextNode(formatBytes(region.size)));
 
                         const tableTd5 = document.createElement('td');
+                        tableTd5.className = 'right-align';
                         tableTd5.appendChild(document.createTextNode(formatBytes(region.used)));
 
                         const tableTd6 = document.createElement('td');
+                        tableTd6.className = 'right-align';
                         tableTd6.appendChild(document.createTextNode(formatBytes(region.size-region.used)));
                         
                         tableTr.appendChild(tableTd1);
@@ -627,10 +633,13 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                             sectionTd3.appendChild(document.createTextNode(\`0x\${section.startAddress.toString(16).padStart(8,'0')}\`));
 
                             const sectionTd4 = document.createElement('td');
+                            sectionTd4.className = 'right-align';
                             sectionTd4.appendChild(document.createTextNode(formatBytes(section.size)));
 
                             const sectionTd5 = document.createElement('td');
+                            sectionTd5.className = 'right-align';
                             const sectionTd6 = document.createElement('td');
+                            sectionTd6.className = 'right-align';
                             
                             sectionTr.appendChild(sectionTd1);
                             sectionTr.appendChild(sectionTd2);
@@ -679,10 +688,13 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                                 pointTd3.appendChild(document.createTextNode(\`0x\${symbol.startAddress.toString(16).padStart(8,'0')}\`));
 
                                 const pointTd4 = document.createElement('td');
+                                pointTd4.className = 'right-align';
                                 pointTd4.appendChild(document.createTextNode(\`\${symbol.size} B\`));
-
+                                
                                 const pointTd5 = document.createElement('td');
-                                const pointTd6 = document.createElement('td');                                
+                                pointTd5.className = 'right-align';
+                                const pointTd6 = document.createElement('td');  
+                                pointTd6.className = 'right-align';                              
 
                                 pointTr.appendChild(pointTd1);
                                 pointTr.appendChild(pointTd2);
