@@ -92,9 +92,17 @@ See [CHANGELOG.md](CHANGELOG.md) for full version history.
 ---
 
 ## 🤝 Contributing
+ 
+Contributions are welcome! Please fork the repo and submit a pull request:
 
-Pull requests are welcome!  
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature-name`)
+3. Commit your changes (`git commit -m "Add feature"`)
+4. Push to branch (`git push origin feature-name`)
+5. Open a Pull Request
+
 If you find bugs or want to request features, feel free to [open an issue](https://github.com/niwciu/stm32-build-analyzer/issues).
+
 
 ---
 
@@ -108,3 +116,14 @@ Fork maintained by [niwciu](https://github.com/niwciu) with enhancements describ
 
 <!-- SEO note -->
 STM32 build analyzer for memory usage, symbol tracking, and map/elf inspection – compatible with Makefiles, CubeIDE, and other toolchains.
+
+## ❤️ Thank you for using this version of STM32 Build Analyzer!
+
+</br></br>
+<div align="center">
+
+***
+
+![myEmbeddedWayBanerWhiteSmaller](https://github.com/user-attachments/assets/f4825882-e285-4e02-a75c-68fc86ff5716)
+***
+</div>
