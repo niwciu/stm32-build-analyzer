@@ -2,9 +2,10 @@
   "name": "stm32-build-analyzer-enhanced",
   "displayName": "STM32 Build Analyzer (Enhanced)", 
   "description": "STM32 Build Analyzer for VSCode - Fork of ATwice291/stm32-build-analyzer with additional features...",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "publisher": "niwciu",
   "license": "MIT",
+  "icon": "images/icon2.png",
   "engines": {
     "vscode": "^1.96.0"
   },
@@ -19,8 +20,8 @@
   "main": "./dist/extension.js",
   "contributes": {
     "icon": {
-      "light": "images/icon.png",
-      "dark": "images/icon.png"
+      "light": "images/icon2.png",
+      "dark": "images/icon2.png"
     },
     "commands": [
       {

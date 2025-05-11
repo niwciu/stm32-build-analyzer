@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.1
+- Added info about current selected build folder in consle view
+
 ## 1.1.0 (Fork Initial Release)
 - Removed mandatory CMake dependency
 - Added interactive compile folder switching

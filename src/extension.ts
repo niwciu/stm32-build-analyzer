@@ -86,9 +86,12 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         if (this._view && this._mapFilePath && this._elfFilePath) {
             try {
                 const regions = this.parseMapAndElfFile(this._mapFilePath, this._elfFilePath);
+                const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+                const currentBuildFolderRelativePath = this._mapFilePath ? path.relative(workspaceFolder, path.dirname(this._mapFilePath)): 'Build folder not found';
                 this._view.webview.postMessage({
                     command: 'showMapData',
-                    data: regions
+                    data: regions,
+                    currentBuildFolderRelativePath
                 });
             } catch (error) {
                 console.error('Error refreshing view:', error);
@@ -495,8 +498,13 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         <body>
             <div class="button-container">
                 <button id="refreshButton" class="button">Refresh Analyze</button>
-                <button id="refreshPathsButton" class="button">Select Build Folder</button>
+                <button id="refreshPathsButton" class="button">Change Build Folder</button>
             </div>
+            <div class="current-build-folder-path-container">
+                <label><strong>Current Build Folder:</strong></label>
+                <div id="buildFolderPath" style="margin-bottom: 10px;"></div>
+            </div>
+
             <table id="regionsTable">
                 <thead id="regionsHead">
                     <tr>
@@ -755,15 +763,23 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                     }
                 });
 
-                window.addEventListener('message', (event) => {
+                window.addEventListener('message', event => {
                     const message = event.data;
-                    if (message.command === 'showMapData') {
-                        fillTableRegions(message.data);
-                    }
-                    if (message.command === 'resetMapData') {
-                        resetTableRegions();
+
+                    switch (message.command) {
+                        case 'showMapData':
+                            resetTableRegions();
+                            fillTableRegions(message.data);
+                            if (message.currentBuildFolderRelativePath) {
+                                const folderDiv = document.getElementById('buildFolderPath');
+                                folderDiv.textContent = message.currentBuildFolderRelativePath;
+                            }
+                            break;
                     }
                 });
+
+
+
             </script>
         </body>
         </html>`;
