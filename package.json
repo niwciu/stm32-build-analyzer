@@ -2,7 +2,7 @@
   "name": "stm32-build-analyzer-enhanced",
   "displayName": "STM32 Build Analyzer (Enhanced)", 
   "description": "STM32 Build Analyzer for VSCode - Fork of ATwice291/stm32-build-analyzer with additional features...",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "publisher": "niwciu",
   "license": "MIT",
   "icon": "images/icon2.png",
@@ -45,6 +45,11 @@
           "type": "string",
           "default": "",
           "description": "Absolute path to the .elf file (overrides automatic search)"
+        },
+        "stm32BuildAnalyzerEnhanced.toolchainPath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the ARM GNU Embedded toolchain binaries (directory containing arm-none-eabi-objdump, arm-none-eabi-nm, etc.). If set, the extension will use these tools instead of relying solely on PATH."
         }
       }
     },
