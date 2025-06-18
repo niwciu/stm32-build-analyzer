@@ -87,7 +87,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
             try {
                 const regions = this.parseMapAndElfFile(this._mapFilePath, this._elfFilePath);
                 const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
-                const currentBuildFolderRelativePath = this._mapFilePath ? path.relative(workspaceFolder, path.dirname(this._mapFilePath)): 'Build folder not found';
+                const currentBuildFolderRelativePath = this._mapFilePath ? path.relative(workspaceFolder, path.dirname(this._mapFilePath)) : 'Build folder not found';
                 this._view.webview.postMessage({
                     command: 'showMapData',
                     data: regions,
@@ -137,7 +137,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                     matchOnDescription: true
                 });
 
-                if (!selected) {return;}
+                if (!selected) { return; }
                 selectedFolder = selected.folderPath;
             }
 
@@ -162,7 +162,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
     private async findBuildFolders(): Promise<string[]> {
         const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders) {return [];}
+        if (!workspaceFolders) { return []; }
 
         const rootPath = workspaceFolders[0].uri.fsPath;
         const buildFolders = new Set<string>();
@@ -220,19 +220,19 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
     private async findFileInFolder(fileExt: string, folderPath: string): Promise<string> {
         try {
-            if (!fs.existsSync(folderPath)) {return "";}
+            if (!fs.existsSync(folderPath)) { return ""; }
 
             const files = fs.readdirSync(folderPath);
             const matchingFiles = files.filter(file => file.endsWith(fileExt));
 
-            if (matchingFiles.length === 0) {return "";}
+            if (matchingFiles.length === 0) { return ""; }
 
             // Jeśli wiele plików, wybierz najbardziej prawdopodobny
             const prioritized = matchingFiles.sort((a, b) => {
-                if (a.includes('Release')) {return -1;}
-                if (b.includes('Release')) {return 1;}
-                if (a.includes('Debug')) {return -1;}
-                if (b.includes('Debug')) {return 1;}
+                if (a.includes('Release')) { return -1; }
+                if (b.includes('Release')) { return 1; }
+                if (a.includes('Debug')) { return -1; }
+                if (b.includes('Debug')) { return 1; }
                 return 0;
             });
 
@@ -249,6 +249,26 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
             console.error(`Error searching for ${fileExt} files in ${folderPath}:`, error);
             return "";
         }
+    }
+
+    // Helper do pobierania komendy toolchain z custom ścieżką lub fallback do PATH
+    private getToolCommand(executableName: string): string {
+        const config = vscode.workspace.getConfiguration('stm32BuildAnalyzerEnhanced');
+        const toolchainDir = config.get<string>('toolchainPath') || '';
+        if (toolchainDir && toolchainDir.trim() !== '') {
+            const fileName = process.platform === 'win32'
+                ? `${executableName}.exe`
+                : executableName;
+            const fullPath = path.join(toolchainDir, fileName);
+            if (!fs.existsSync(fullPath)) {
+                vscode.window.showWarningMessage(
+                    `STM32 Build Analyzer: executable not found at ${fullPath}, falling back to "${executableName}" from PATH.`
+                );
+                return executableName;
+            }
+            return fullPath;
+        }
+        return executableName;
     }
 
     private parseMapAndElfFile(mapFilePath: string, elfFilePath: string): Region[] {
@@ -290,11 +310,12 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
         // Parse ELF file sections using objdump
         try {
-            const result = cp.spawnSync('arm-none-eabi-objdump', ['-h', elfFilePath]);
-            if (result.error) {
-                console.error('Error executing objdump:', result.error);
+            const objdumpCmd = this.getToolCommand('arm-none-eabi-objdump');
+            const resultObjdump = cp.spawnSync(objdumpCmd, ['-h', elfFilePath]);
+            if (resultObjdump.error) {
+                console.error('Error executing objdump:', resultObjdump.error);
             } else {
-                const lines = result.stdout.toString().split('\n');
+                const lines = resultObjdump.stdout.toString().split('\n');
                 let prevLine: string = "";
                 for (const line of lines) {
                     const allocMatch = allocRegex.exec(line);
@@ -342,18 +363,19 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
         // Parse ELF symbols using nm
         try {
-            const result = cp.spawnSync('arm-none-eabi-nm', ['-C', '-S', '-n', '-l', '--defined-only', elfFilePath]);
-            if (result.error) {
-                console.error('Error executing nm:', result.error);
+            const nmCmd = this.getToolCommand('arm-none-eabi-nm');
+            const resultNm = cp.spawnSync(nmCmd, ['-C', '-S', '-n', '-l', '--defined-only', elfFilePath]);
+            if (resultNm.error) {
+                console.error('Error executing nm:', resultNm.error);
             } else {
-                const lines = result.stdout.toString().split('\n');
+                const lines = resultNm.stdout.toString().split('\n');
                 for (const line of lines) {
                     const match = symbolRegex.exec(line);
                     if (!match) { continue; }
-                    const [, address, size, type, name, path] = match;
+                    const [, address, size, type, name, pathValue] = match;
                     const symbolStart = parseInt(address, 16);
                     const symbolSize = Number.isNaN(parseInt(size, 16)) ? 0 : parseInt(size, 16);
-                    const pathMatch = pathRegex.exec(path || "");
+                    const pathMatch = pathRegex.exec(pathValue || "");
                     let filePath: string = "";
                     let fileRow: number = 0;
                     if (pathMatch) {
@@ -377,7 +399,7 @@ class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
                                 row: fileRow
                             });
                             break;
-                        }                        
+                        }
                     }
                 }
             }
