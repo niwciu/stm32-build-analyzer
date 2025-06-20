@@ -1,8 +1,8 @@
 {
   "name": "stm32-build-analyzer-enhanced",
-  "displayName": "STM32 Build Analyzer (Enhanced)", 
+  "displayName": "STM32 Build Analyzer (Enhanced)",
   "description": "STM32 Build Analyzer for VSCode - Fork of ATwice291/stm32-build-analyzer with additional features...",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "publisher": "niwciu",
   "license": "MIT",
   "icon": "images/icon2.png",
@@ -45,10 +45,19 @@
           "type": "string",
           "default": "",
           "description": "Absolute path to the .elf file (overrides automatic search)"
+        },
+        "stm32BuildAnalyzerEnhanced.toolchainPath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the ARM GNU Embedded toolchain binaries (directory containing arm-none-eabi-objdump, arm-none-eabi-nm, etc.). If set, the extension will use these tools instead of relying solely on PATH."
+        },
+        "stm32BuildAnalyzerEnhanced.debug": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable verbose logging for debugging purposes."
         }
       }
     },
-    
     "viewsContainers": {
       "panel": [
         {
@@ -80,17 +89,20 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.96.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
+    "@types/vscode": "^1.96.0",
     "@typescript-eslint/eslint-plugin": "^8.17.0",
     "@typescript-eslint/parser": "^8.17.0",
-    "eslint": "^9.16.0",
-    "typescript": "^5.7.2",
-    "ts-loader": "^9.5.1",
-    "webpack": "^5.95.0",
-    "webpack-cli": "^5.1.4",
     "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.4.1"
+    "@vscode/test-electron": "^2.4.1",
+    "eslint": "^9.16.0",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.7.2",
+    "webpack": "^5.95.0",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "test": "^3.3.0"
   }
 }
