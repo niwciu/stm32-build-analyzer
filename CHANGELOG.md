@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.2] – 2025‑06‑20
+
+### Added
+- New `toolchainPath` configuration option allowing users to specify a custom path to the ARM GCC toolchain (e.g., when not available in the system `$PATH`).
+
+### Changed
+- Major codebase refactor:
+  - Logic split into separate modules (`BuildAnalyzerProvider`, `MapElfParser`, `BuildFolderResolver`, `WebviewRenderer`).
+  - Improves maintainability, readability, and testability.
+
+### Fixed
+- Improved error handling when `.map` or `.elf` files are missing — users now see clear error messages.
+- Updated `brace-expansion` dependency to latest patch version for security and compatibility.
+
+
 ## 1.1.1
 - Added info about current selected build folder in consle view
 
