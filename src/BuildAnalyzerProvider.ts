@@ -24,10 +24,14 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
   resolveWebviewView(view: vscode.WebviewView): void {
     this.renderer = new WebviewRenderer(this.context, view);
     this.renderer.init();
-    this.refresh();
+    view.onDidChangeVisibility(() => {
+      if (view.visible) {
+        this.refresh();
+      }
+    });
   }
 
-  /** Szybki refresh – parsuje przy użyciu zcache’owanych ścieżek */
+/** Fast refresh – parses using cached paths */
   public async refresh() {
     try {
       this.paths = this.paths ?? await this.resolver.resolve();
@@ -39,7 +43,7 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  /** Pełny refresh – czyści cache i wymusza ponowny wybór build folderu */
+ /** Full refresh – clears cache and forces reselection of build folder */
   public async fullRefresh() {
     this.paths = undefined;
     await this.refresh();
