@@ -50,6 +50,11 @@
           "type": "string",
           "default": "",
           "description": "Absolute path to the ARM GNU Embedded toolchain binaries (directory containing arm-none-eabi-objdump, arm-none-eabi-nm, etc.). If set, the extension will use these tools instead of relying solely on PATH."
+        },
+        "stm32BuildAnalyzerEnhanced.debug": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable verbose logging for debugging purposes."
         }
       }
     },
