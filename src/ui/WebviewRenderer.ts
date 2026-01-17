@@ -166,6 +166,17 @@ export class WebviewRenderer {
                 #refreshPathsButton:hover {
                     background-color: var(--vscode-button-secondaryHoverBackground);
                 }
+                #showSelectedButton {
+                    padding: 5px 10px;
+                    cursor: pointer;
+                    background-color: var(--vscode-button-secondaryBackground);
+                    color: var(--vscode-button-secondaryForeground);
+                    border: 1px solid var(--vscode-button-secondaryBorder);
+                    border-radius: 2px;
+                }
+                #showSelectedButton:hover {
+                    background-color: var(--vscode-button-secondaryHoverBackground);
+                }
                 #searchInput {
                     width: 220px;
                     padding: 4px 6px;
@@ -211,18 +222,36 @@ export class WebviewRenderer {
                 .sort-button[data-active="true"] {
                     border-color: var(--vscode-focusBorder);
                 }
+                .message-banner {
+                    display: none;
+                    margin-bottom: 10px;
+                    padding: 6px 8px;
+                    border-radius: 2px;
+                    border: 1px solid var(--vscode-editorWidget-border);
+                    background: var(--vscode-editorWidget-background);
+                    color: var(--vscode-editorWidget-foreground);
+                    font-size: 12px;
+                }
+                .message-banner.visible {
+                    display: block;
+                }
+                .row-select {
+                    margin-right: 6px;
+                }
             </style>
         </head>
         <body>
             <div class="button-container">
                 <button id="refreshButton" class="button">Refresh Analyze</button>
                 <button id="refreshPathsButton" class="button">Change Build Folder</button>
+                <button id="showSelectedButton" class="button" title="Show only selected objects">Show Selected</button>
                 <input id="searchInput" type="text" placeholder="Search symbols..." />
                 <label class="case-toggle" title="Case sensitive search">
                     <input type="checkbox" id="caseSensitiveToggle" />
                     Aa
                 </label>
             </div>
+            <div id="messageBanner" class="message-banner" role="status" aria-live="polite"></div>
             <div class="current-build-folder-path-container">
                 <label><strong>Current Build Folder:</strong></label>
                 <div id="buildFolderPath" style="margin-bottom: 10px;"></div>
@@ -309,6 +338,18 @@ export class WebviewRenderer {
                     return normalizeText(value, caseSensitive).includes(normalizeText(query, caseSensitive));
                 }
 
+                function getRegionKey(region) {
+                    return 'region:' + region.name;
+                }
+
+                function getSectionKey(region, section) {
+                    return 'section:' + region.name + '::' + section.name;
+                }
+
+                function getSymbolKey(region, section, symbol) {
+                    return 'symbol:' + region.name + '::' + section.name + '::' + symbol.name + '::' + symbol.startAddress;
+                }
+
                 function filterRegions(regions, filterState) {
                     if (!filterState.query) {
                         return {
@@ -359,6 +400,51 @@ export class WebviewRenderer {
 
                     return { regions: filtered, expanded, isFiltering: true };
                 }
+
+                function filterSelectedRegions(regions) {
+                    const filtered = [];
+
+                    regions.forEach(region => {
+                        const regionKey = getRegionKey(region);
+                        const regionSelected = selectedState.has(regionKey);
+                        const selectedSections = [];
+
+                        region.sections.forEach(section => {
+                            const sectionKey = getSectionKey(region, section);
+                            const sectionSelected = selectedState.has(sectionKey);
+                            const selectedSymbols = section.symbols.filter(symbol => {
+                                return selectedState.has(getSymbolKey(region, section, symbol));
+                            });
+
+                            if (sectionSelected || selectedSymbols.length > 0) {
+                                selectedSections.push({
+                                    ...section,
+                                    symbols: sectionSelected ? section.symbols : selectedSymbols
+                                });
+                            }
+                        });
+
+                        if (regionSelected || selectedSections.length > 0) {
+                            filtered.push({
+                                ...region,
+                                sections: regionSelected ? region.sections : selectedSections
+                            });
+                        }
+                    });
+
+                    return filtered;
+                }
+
+                function buildExpandedState(regions) {
+                    const expanded = { regions: new Set(), sections: new Set() };
+                    regions.forEach(region => {
+                        expanded.regions.add(getRegionKey(region));
+                        region.sections.forEach(section => {
+                            expanded.sections.add(getSectionKey(region, section));
+                        });
+                    });
+                    return expanded;
+                }
                     
                 function fillTableRegions(regions, sortState, expandedState) {
                     const tableBody = document.getElementById('regionsBody');
@@ -370,7 +456,7 @@ export class WebviewRenderer {
 
                     displayRegions.forEach(region => {
                         id++;
-                        const regionKey = 'region:' + region.name;
+                        const regionKey = getRegionKey(region);
                         const percent = region.used / region.size * 100;
                         const isRegionExpanded = expandedState.regions.has(regionKey);
 
@@ -380,6 +466,7 @@ export class WebviewRenderer {
                         tableTr.setAttribute('data-id', regionKey);
                         
                         const tableTd1 = document.createElement('td');
+                        tableTd1.appendChild(createSelectionCheckbox(regionKey));
                         const plus = document.createElement('span');
                         plus.className = 'toggle';
                         plus.textContent = isRegionExpanded ? '−' : '+';
@@ -439,7 +526,7 @@ export class WebviewRenderer {
 
                         region.sections.forEach(section => {
                             id++;
-                            const sectionKey = 'section:' + region.name + '::' + section.name;
+                            const sectionKey = getSectionKey(region, section);
                             const isSectionExpanded = expandedState.sections.has(sectionKey);
                             const sectionTr = document.createElement('tr');
                             sectionTr.className = 'toggleTr level-2';
@@ -449,6 +536,7 @@ export class WebviewRenderer {
                             sectionTr.style.display = isRegionExpanded ? '' : 'none';
 
                             const sectionTd1 = document.createElement('td');
+                            sectionTd1.appendChild(createSelectionCheckbox(sectionKey));
                             const plus = document.createElement('span');
                             plus.className = 'toggle';
                             plus.textContent = isSectionExpanded ? '−' : '+';
@@ -488,7 +576,7 @@ export class WebviewRenderer {
 
                             section.symbols.forEach(symbol => {
                                 id++;
-                                const symbolKey = 'symbol:' + region.name + '::' + section.name + '::' + symbol.name + '::' + symbol.startAddress;
+                                const symbolKey = getSymbolKey(region, section, symbol);
                                 const pointTr = document.createElement('tr');
                                 pointTr.className = 'toggleTr level-3';
                                 pointTr.setAttribute('data-level', '3');
@@ -497,6 +585,7 @@ export class WebviewRenderer {
                                 pointTr.style.display = isRegionExpanded && isSectionExpanded ? '' : 'none';
                                 
                                 const pointTd1 = document.createElement('td');
+                                pointTd1.appendChild(createSelectionCheckbox(symbolKey));
                                 const pointTd2 = document.createElement('td');
                                 pointTd2.setAttribute('title', \`\${symbol.path}:\${symbol.row}\`);
 
@@ -555,9 +644,27 @@ export class WebviewRenderer {
                     document.getElementById('refreshPathsButton').addEventListener('click', () => {
                         vscode.postMessage({ command: 'refreshPaths' });
                     });
+                    document.getElementById('showSelectedButton').addEventListener('click', () => {
+                        const query = filterState.query.trim();
+                        if (query) {
+                            showMessage('Aby użyć „Show Selected”, wyczyść pole wyszukiwania „Search symbols...” i spróbuj ponownie.');
+                            return;
+                        }
+                        if (selectedState.size === 0) {
+                            showMessage('Aby użyć „Show Selected”, zaznacz co najmniej jeden obiekt w tabeli (kolumna z checkboxami po lewej).');
+                            return;
+                        }
+                        isShowingSelected = !isShowingSelected;
+                        updateShowSelectedButton();
+                        renderRegions();
+                    });
 
                     document.getElementById('searchInput').addEventListener('input', (event) => {
                         filterState.query = event.target.value ?? '';
+                        if (filterState.query.trim() && isShowingSelected) {
+                            isShowingSelected = false;
+                            updateShowSelectedButton();
+                        }
                         renderRegions();
                     });
 
@@ -571,6 +678,50 @@ export class WebviewRenderer {
                 let sortState = { key: null, direction: 'asc' };
                 const expandedState = { regions: new Set(), sections: new Set() };
                 const filterState = { query: '', caseSensitive: false };
+                const selectedState = new Set();
+                let isShowingSelected = false;
+                const messageBanner = document.getElementById('messageBanner');
+                let messageTimer;
+
+                function showMessage(text) {
+                    messageBanner.textContent = text;
+                    messageBanner.classList.add('visible');
+                    if (messageTimer) {
+                        clearTimeout(messageTimer);
+                    }
+                    messageTimer = setTimeout(() => {
+                        messageBanner.classList.remove('visible');
+                    }, 5000);
+                }
+
+                function updateShowSelectedButton() {
+                    const button = document.getElementById('showSelectedButton');
+                    button.textContent = isShowingSelected ? 'Show All' : 'Show Selected';
+                    button.title = isShowingSelected ? 'Show all objects' : 'Show only selected objects';
+                }
+
+                function createSelectionCheckbox(rowId) {
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.className = 'row-select';
+                    checkbox.dataset.rowId = rowId;
+                    checkbox.checked = selectedState.has(rowId);
+                    checkbox.setAttribute('aria-label', 'Select row');
+                    checkbox.addEventListener('click', (event) => {
+                        event.stopPropagation();
+                    });
+                    checkbox.addEventListener('change', () => {
+                        if (checkbox.checked) {
+                            selectedState.add(rowId);
+                        } else {
+                            selectedState.delete(rowId);
+                        }
+                        if (isShowingSelected) {
+                            renderRegions();
+                        }
+                    });
+                    return checkbox;
+                }
 
                 document.getElementById('regionsTable').addEventListener('click', (e) => {
                     const toggleSpan = e.target.closest('.toggle');
@@ -626,13 +777,22 @@ export class WebviewRenderer {
                 });
 
                 function renderRegions() {
-                    const { regions, expanded, isFiltering } = filterRegions(lastRegions, filterState);
-                    const expandedToUse = isFiltering
-                        ? expanded
-                        : expandedState;
+                    let regionsToRender = lastRegions;
+                    let expandedToUse = expandedState;
+
+                    if (isShowingSelected) {
+                        regionsToRender = filterSelectedRegions(lastRegions);
+                        expandedToUse = buildExpandedState(regionsToRender);
+                    } else {
+                        const { regions, expanded, isFiltering } = filterRegions(lastRegions, filterState);
+                        regionsToRender = regions;
+                        expandedToUse = isFiltering
+                            ? expanded
+                            : expandedState;
+                    }
 
                     resetTableRegions();
-                    fillTableRegions(regions, sortState, expandedToUse);
+                    fillTableRegions(regionsToRender, sortState, expandedToUse);
                     updateSortIndicators();
                 }
 
@@ -671,6 +831,9 @@ export class WebviewRenderer {
                     switch (message.command) {
                         case 'showMapData':
                             lastRegions = message.data ?? [];
+                            selectedState.clear();
+                            isShowingSelected = false;
+                            updateShowSelectedButton();
                             renderRegions();
                             if (message.currentBuildFolderRelativePath) {
                                 const folderDiv = document.getElementById('buildFolderPath');
