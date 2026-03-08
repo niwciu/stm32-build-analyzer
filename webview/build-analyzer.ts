@@ -812,10 +812,13 @@ function attachTableHandlers(view: ViewMode): void {
 
         if (sourceLink) {
             e.preventDefault();
+            const scrollContainer = document.getElementById('scroll-container') as HTMLElement;
+            const scrollTop = scrollContainer.scrollTop;
             vscode.postMessage({
                 command: 'openFile',
                 filePath: sourceLink.dataset.file,
-                lineNumber: parseInt(sourceLink.dataset.line || '0', 10)
+                lineNumber: parseInt(sourceLink.dataset.line || '0', 10),
+                scrollTop: scrollTop
             });
             return;
         }
@@ -1098,6 +1101,10 @@ window.addEventListener('message', (event: MessageEvent) => {
                     performSearch(searchInput.value.trim(), table);
                 }
             }
+            break;
+        case 'restoreScroll':
+            const scrollContainer = document.getElementById('scroll-container') as HTMLElement;
+            scrollContainer.scrollTo(0, message.scrollTop);
             break;
     }
 });

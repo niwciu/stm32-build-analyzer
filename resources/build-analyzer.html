@@ -16,6 +16,8 @@
       background: var(--vscode-editor-background);
       margin: 0;
       padding: 16px;
+      height: 100vh;
+      overflow: hidden;
     }
 
     .toolbar {
@@ -463,54 +465,56 @@
     <span id="searchMatchCount"></span>
   </div>
 
-  <div class="current-build-folder">
-    <strong>Current Build Folder:</strong>
-    <span id="buildFolderPath"></span>
+  <div id="scroll-container" style="height: 100%; overflow-y: auto;">
+    <div class="current-build-folder">
+      <strong>Current Build Folder:</strong>
+      <span id="buildFolderPath"></span>
+    </div>
+
+    <section id="classicView" class="view-pane">
+      <table id="regionsTable" class="gray">
+        <thead id="regionsHead">
+          <tr>
+            <td></td>
+            <td class="selection-header">
+              Sel <button class="clear-selection" id="clearSelectionButtonClassic" type="button" aria-label="Clear selection">✕</button>
+            </td>
+            <td class="sortable-header" data-sort="name" title="Sort symbols by name">
+              Name <button class="sort-button" data-sort-key="name" data-active="false" aria-label="Sort by name">⇅</button>
+            </td>
+            <td class="sortable-header" data-sort="address" title="Sort symbols by address">
+              Address <button class="sort-button" data-sort-key="address" data-active="false" aria-label="Sort by address">⇅</button>
+            </td>
+            <td class="sortable-header" data-sort="size" title="Sort symbols by size">
+              Size <button class="sort-button" data-sort-key="size" data-active="false" aria-label="Sort by size">⇅</button>
+            </td>
+            <td>Used</td>
+            <td>Free</td>
+          </tr>
+        </thead>
+        <tbody id="regionsBody"></tbody>
+      </table>
+    </section>
+
+    <section id="tableView" class="view-pane is-hidden">
+      <table id="regionsTableModern" class="modern">
+        <thead id="regionsHeadModern">
+          <tr>
+            <th></th>
+            <th class="selection-header">
+              Sel <button class="clear-selection" id="clearSelectionButton" type="button" aria-label="Clear selection">✕</button>
+            </th>
+            <th class="sortable-header" data-sort="name">Name <span id="sort-name" class="sort-indicator">↕</span></th>
+            <th class="sortable-header" data-sort="address">Address <span id="sort-address" class="sort-indicator">↕</span></th>
+            <th class="sortable-header" data-sort="size">Size <span id="sort-size" class="sort-indicator">↕</span></th>
+            <th>Used</th>
+            <th>Free</th>
+          </tr>
+        </thead>
+        <tbody id="regionsBodyModern"></tbody>
+      </table>
+    </section>
   </div>
-
-  <section id="classicView" class="view-pane">
-    <table id="regionsTable" class="gray">
-      <thead id="regionsHead">
-        <tr>
-          <td></td>
-          <td class="selection-header">
-            Sel <button class="clear-selection" id="clearSelectionButtonClassic" type="button" aria-label="Clear selection">✕</button>
-          </td>
-          <td class="sortable-header" data-sort="name" title="Sort symbols by name">
-            Name <button class="sort-button" data-sort-key="name" data-active="false" aria-label="Sort by name">⇅</button>
-          </td>
-          <td class="sortable-header" data-sort="address" title="Sort symbols by address">
-            Address <button class="sort-button" data-sort-key="address" data-active="false" aria-label="Sort by address">⇅</button>
-          </td>
-          <td class="sortable-header" data-sort="size" title="Sort symbols by size">
-            Size <button class="sort-button" data-sort-key="size" data-active="false" aria-label="Sort by size">⇅</button>
-          </td>
-          <td>Used</td>
-          <td>Free</td>
-        </tr>
-      </thead>
-      <tbody id="regionsBody"></tbody>
-    </table>
-  </section>
-
-  <section id="tableView" class="view-pane is-hidden">
-    <table id="regionsTableModern" class="modern">
-      <thead id="regionsHeadModern">
-        <tr>
-          <th></th>
-          <th class="selection-header">
-            Sel <button class="clear-selection" id="clearSelectionButton" type="button" aria-label="Clear selection">✕</button>
-          </th>
-          <th class="sortable-header" data-sort="name">Name <span id="sort-name" class="sort-indicator">↕</span></th>
-          <th class="sortable-header" data-sort="address">Address <span id="sort-address" class="sort-indicator">↕</span></th>
-          <th class="sortable-header" data-sort="size">Size <span id="sort-size" class="sort-indicator">↕</span></th>
-          <th>Used</th>
-          <th>Free</th>
-        </tr>
-      </thead>
-      <tbody id="regionsBodyModern"></tbody>
-    </table>
-  </section>
 
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>

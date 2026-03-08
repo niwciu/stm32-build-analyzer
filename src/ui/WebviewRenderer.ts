@@ -49,7 +49,7 @@ export class WebviewRenderer {
           vscode.commands.executeCommand('stm32BuildAnalyzerEnhanced.refreshPaths');
           break;
         case 'openFile':
-          this.openFile(msg.filePath, msg.lineNumber);
+          this.openFile(msg.filePath, msg.lineNumber, msg.scrollTop);
           break;
       }
     });
@@ -67,7 +67,7 @@ export class WebviewRenderer {
     });
   }
 
-  private async openFile(file: string, line: number) {
+  private async openFile(file: string, line: number, scrollTop?: number) {
     try {
       if (this.debug) {
         console.log(`[STM32 Webview] Attempting to open file: ${file} @ ${line}`);
@@ -75,10 +75,18 @@ export class WebviewRenderer {
 
       const uri = vscode.Uri.file(file);
       const doc = await vscode.workspace.openTextDocument(uri);
-      const ed = await vscode.window.showTextDocument(doc);
+      const ed = await vscode.window.showTextDocument(doc, { preserveFocus: true });
       const pos = new vscode.Position(line - 1, 0);
       ed.selection = new vscode.Selection(pos, pos);
       ed.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
+
+      // Send message to restore scroll position in webview
+      if (scrollTop !== undefined) {
+        this.view.webview.postMessage({
+          command: 'restoreScroll',
+          scrollTop: scrollTop
+        });
+      }
     } catch (err) {
       vscode.window.showErrorMessage(`Cannot open ${file}`);
       if (this.debug) {

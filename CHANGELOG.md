@@ -1,4 +1,9 @@
 # Changelog
+## [1.1.5] – 2026-03-08
+
+### Fixed
+- Preserve scroll position in the webview table when clicking hyperlinks to open source files.
+
 ## [1.1.4] – 2026-01-29
 
 ### Added

@@ -70,11 +70,11 @@ This fork removes that dependency, adds broader file handling, and enhances the 
    ```bash
    vsce package
    ```
-4. This will generate a file like: `stm32-build-analyzer-enhanced-1.1.4.vsix`
+4. This will generate a file like: `stm32-build-analyzer-enhanced-1.1.5.vsix`
 
 5. Install the extension in VS Code: 
    ```bash
-   code --install-extension stm32-build-analyzer-enhanced-1.1.4.vsix
+   code --install-extension stm32-build-analyzer-enhanced-1.1.5.vsix
    ```
 
 
