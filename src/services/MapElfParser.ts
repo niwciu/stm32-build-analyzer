@@ -1,5 +1,6 @@
 import * as cp from 'child_process';
 import * as fs from 'fs';
+import * as path from 'path';
 import { Region, Section, SymbolEntry } from '../models';
 
 export class MapElfParser {
@@ -182,7 +183,8 @@ export class MapElfParser {
   }
 
   private getTool(exe: string): string {
-    const full = `${this.toolchainPath}/${exe}${process.platform === 'win32' ? '.exe' : ''}`;
+    const suffix = process.platform === 'win32' ? '.exe' : '';
+    const full = path.join(this.toolchainPath, exe + suffix);
     if (this.toolchainPath && fs.existsSync(full)) {
       if (this.debug) {console.log(`[STM32 Parser] Using tool: ${full}`);}
       return full;

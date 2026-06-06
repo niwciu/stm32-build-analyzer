@@ -31,7 +31,6 @@ export class BuildFolderResolver {
   private readonly debug: boolean;
   private workspaceRoot?: string;
   private autoDisplayNames = new Map<string, string>();
-  private autoNameCounts = new Map<string, number>();
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this.debug = vscode.workspace
@@ -89,11 +88,8 @@ export class BuildFolderResolver {
     const resolvedManualPairs = await this.resolveManualPairs(root, manualPairs);
     const folders = await this.findBuildFolders(root);
     this.autoDisplayNames = new Map();
-    this.autoNameCounts = new Map();
     folders.forEach(folder => {
-      const displayName = this.getBuildDisplayName(folder);
-      this.autoDisplayNames.set(folder, displayName);
-      this.autoNameCounts.set(displayName, (this.autoNameCounts.get(displayName) ?? 0) + 1);
+      this.autoDisplayNames.set(folder, this.getBuildDisplayName(folder));
     });
     const selections = this.buildSelections(resolvedManualPairs, folders);
     if (selections.length === 0) {
@@ -161,9 +157,6 @@ export class BuildFolderResolver {
 
     if (await this.exists(resolved)) {
       if (this.debug) {console.log(`[STM32] Using toolchain: ${resolved}`);}
-      vscode.window.showInformationMessage(
-        `STM32 Build Analyzer: Using toolchain from ${resolved}`
-      );
       return resolved;
     }
 
