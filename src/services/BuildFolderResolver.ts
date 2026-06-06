@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { resolveVariables as applyVariables } from '../utils/pathVariables';
 
 export interface BuildPaths {
   map: string;
@@ -54,8 +55,12 @@ export class BuildFolderResolver {
     }
 
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const resolvedCustomMap = customMap ? this.resolveCustomPath(customMap, workspaceRoot) : undefined;
-    const resolvedCustomElf = customElf ? this.resolveCustomPath(customElf, workspaceRoot) : undefined;
+    const resolvedCustomMap = customMap
+      ? this.resolveCustomPath(this.resolveVariables(customMap), workspaceRoot)
+      : undefined;
+    const resolvedCustomElf = customElf
+      ? this.resolveCustomPath(this.resolveVariables(customElf), workspaceRoot)
+      : undefined;
 
     if (
       resolvedCustomMap
@@ -146,22 +151,27 @@ export class BuildFolderResolver {
 
   private async getToolchainPath(): Promise<string | undefined> {
     const cfg = vscode.workspace.getConfiguration('stm32BuildAnalyzerEnhanced');
-    const toolchain = cfg.get<string>('toolchainPath');
+    const raw = cfg.get<string>('toolchainPath');
 
-    if (!toolchain) {return undefined;}
+    if (!raw) {return undefined;}
 
-    if (await this.exists(toolchain)) {
-      if (this.debug) {console.log(`[STM32] Using toolchain: ${toolchain}`);}
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const resolved = this.resolveCustomPath(this.resolveVariables(raw), workspaceRoot);
+    if (!resolved) {return undefined;}
+
+    if (await this.exists(resolved)) {
+      if (this.debug) {console.log(`[STM32] Using toolchain: ${resolved}`);}
       vscode.window.showInformationMessage(
-        `STM32 Build Analyzer: Using toolchain from ${toolchain}`
+        `STM32 Build Analyzer: Using toolchain from ${resolved}`
       );
-      return toolchain;
-    } else {
-      vscode.window.showWarningMessage(
-        `STM32 Build Analyzer: toolchainPath not found: ${toolchain}`
-      );
-      if (this.debug) {console.warn(`[STM32] Toolchain path not found: ${toolchain}`);}
+      return resolved;
     }
+
+    vscode.window.showWarningMessage(
+      `STM32 Build Analyzer: toolchainPath not found: ${resolved}`
+      + (resolved !== raw ? ` (resolved from: ${raw})` : '')
+    );
+    if (this.debug) {console.warn(`[STM32] Toolchain path not found: ${resolved}`);}
 
     return undefined;
   }
@@ -296,6 +306,11 @@ export class BuildFolderResolver {
     }
 
     return resolved;
+  }
+
+  private resolveVariables(value: string): string {
+    const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    return applyVariables(value, wsRoot);
   }
 
   private resolveCustomPath(value: string, root?: string): string | undefined {
