@@ -1,4 +1,18 @@
 # Changelog
+## [1.1.6] – 2026-06-06
+
+### Added
+- Variable resolution support (`${userHome}`, `${env:VAR}`, `${workspaceFolder}`) in `toolchainPath`, `mapFilePath`, and `elfFilePath` settings.
+- Unit tests for variable expansion, map parsing, and command registration (32 tests total).
+
+### Fixed
+- `toolchainPath`, `mapFilePath`, and `elfFilePath` now also accept workspace-relative paths.
+- Windows path separator bug in toolchain binary resolution.
+- Noisy info notification shown on every refresh when `toolchainPath` was configured.
+
+### Changed
+- Settings descriptions updated to document variable and relative path support.
+
 ## [1.1.5] – 2026-03-08
 
 ### Fixed
