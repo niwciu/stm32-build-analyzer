@@ -1,5 +1,6 @@
 import * as cp from 'child_process';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { Region, Section, SymbolEntry } from '../models';
 
@@ -24,10 +25,68 @@ export class MapElfParser {
       );
     }
 
-    this.parseSections(elfPath, regions);
-    this.parseSymbols(elfPath, regions);
+    // Analyze a throwaway copy of the ELF instead of the build's own output.
+    // arm-none-eabi-objdump/nm open the ELF without FILE_SHARE_DELETE on
+    // Windows, so reading the live file blocks the next build from
+    // deleting/overwriting it (issue #11). Working on a copy keeps the
+    // original handle-free; if the copy cannot be made we fall back to the
+    // original so analysis still works (e.g. POSIX, where this is harmless).
+    this.withElfCopy(elfPath, safeElf => {
+      this.parseSections(safeElf, regions);
+      this.parseSymbols(safeElf, regions);
+    });
 
     return regions;
+  }
+
+  /**
+   * Runs `fn` against a temporary copy of the ELF, then removes the copy.
+   * Falls back to the original path if the copy cannot be created so the
+   * caller always gets a usable path. The copy is read via fs (libuv opens
+   * with share-delete semantics), so even creating it never blocks a build.
+   */
+  private withElfCopy(elfPath: string, fn: (elf: string) => void): void {
+    let tempDir: string | undefined;
+    let elfForTools = elfPath;
+
+    try {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stm32-build-analyzer-'));
+      const dest = path.join(tempDir, path.basename(elfPath));
+      // readFileSync + writeFileSync (not copyFileSync) guarantees the
+      // original is only opened with libuv's share-delete flags.
+      fs.writeFileSync(dest, fs.readFileSync(elfPath));
+      elfForTools = dest;
+      if (this.debug) {
+        console.log(`[STM32 Parser] Analyzing ELF copy: ${dest}`);
+      }
+    } catch (err: any) {
+      if (this.debug) {
+        console.warn(`[STM32 Parser] Could not create ELF copy, using original: ${err?.message ?? err}`);
+      }
+      if (tempDir) {
+        this.removeTempDir(tempDir);
+        tempDir = undefined;
+      }
+      elfForTools = elfPath;
+    }
+
+    try {
+      fn(elfForTools);
+    } finally {
+      if (tempDir) {
+        this.removeTempDir(tempDir);
+      }
+    }
+  }
+
+  private removeTempDir(dir: string): void {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch (err: any) {
+      if (this.debug) {
+        console.warn(`[STM32 Parser] Failed to remove temp dir ${dir}: ${err?.message ?? err}`);
+      }
+    }
   }
 
   private parseMap(mapFile: string): Region[] {

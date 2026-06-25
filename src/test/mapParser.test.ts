@@ -134,4 +134,72 @@ suite('MapElfParser', () => {
       }
     });
   });
+
+  // Regression guard for issue #11: the parser must analyze a throwaway copy
+  // of the ELF, never the build's own output file, so it can't keep a handle
+  // open that blocks the next build from deleting/overwriting it on Windows.
+  suite('withElfCopy', () => {
+    const withElfCopy = (p: MapElfParser, elf: string, fn: (elf: string) => void): void =>
+      (p as any).withElfCopy(elf, fn);
+
+    let elfFile: string;
+
+    setup(() => {
+      elfFile = path.join(os.tmpdir(), `stm32-test-${Date.now()}-${Math.random().toString(36).slice(2)}.elf`);
+      fs.writeFileSync(elfFile, Buffer.from('ELF\0fake-binary-content'));
+    });
+
+    teardown(() => {
+      try { fs.unlinkSync(elfFile); } catch { /* ignore */ }
+    });
+
+    test('passes a different path than the original ELF', () => {
+      let seen: string | undefined;
+      withElfCopy(parser, elfFile, p => { seen = p; });
+      assert.notStrictEqual(seen, elfFile);
+    });
+
+    test('the copy exists during the callback', () => {
+      let existedDuring = false;
+      withElfCopy(parser, elfFile, p => { existedDuring = fs.existsSync(p); });
+      assert.ok(existedDuring);
+    });
+
+    test('the copy has the same bytes as the original', () => {
+      const original = fs.readFileSync(elfFile);
+      let copyContent: Buffer | undefined;
+      withElfCopy(parser, elfFile, p => { copyContent = fs.readFileSync(p); });
+      assert.ok(copyContent && original.equals(copyContent));
+    });
+
+    test('removes the copy after the callback returns', () => {
+      let copyPath: string | undefined;
+      withElfCopy(parser, elfFile, p => { copyPath = p; });
+      assert.ok(copyPath);
+      assert.ok(!fs.existsSync(copyPath!));
+    });
+
+    test('leaves the original ELF untouched', () => {
+      const before = fs.readFileSync(elfFile);
+      withElfCopy(parser, elfFile, () => { /* noop */ });
+      assert.ok(fs.existsSync(elfFile));
+      assert.ok(before.equals(fs.readFileSync(elfFile)));
+    });
+
+    test('cleans up the copy even when the callback throws', () => {
+      let copyPath: string | undefined;
+      assert.throws(() => {
+        withElfCopy(parser, elfFile, p => { copyPath = p; throw new Error('boom'); });
+      }, /boom/);
+      assert.ok(copyPath);
+      assert.ok(!fs.existsSync(copyPath!));
+    });
+
+    test('falls back to the original path when the ELF cannot be copied', () => {
+      const missing = path.join(os.tmpdir(), `stm32-missing-${Date.now()}.elf`);
+      let seen: string | undefined;
+      withElfCopy(parser, missing, p => { seen = p; });
+      assert.strictEqual(seen, missing);
+    });
+  });
 });
