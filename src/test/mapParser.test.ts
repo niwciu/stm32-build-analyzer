@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { MapElfParser } from '../services/MapElfParser';
+import { MapElfParser, ToolExecutionError } from '../services/MapElfParser';
 
 const SAMPLE_MAP = `
 Memory Configuration
@@ -200,6 +200,124 @@ suite('MapElfParser', () => {
       let seen: string | undefined;
       withElfCopy(parser, missing, p => { seen = p; });
       assert.strictEqual(seen, missing);
+    });
+  });
+
+  suite('tool resolution', () => {
+    let tempDir: string;
+
+    setup(() => {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stm32-tool-resolution-'));
+    });
+
+    teardown(() => {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    test('uses a configured binary when it exists', () => {
+      const executable = `arm-none-eabi-objdump${process.platform === 'win32' ? '.exe' : ''}`;
+      const fullPath = path.join(tempDir, executable);
+      fs.writeFileSync(fullPath, '');
+      const configuredParser = new MapElfParser(tempDir, false);
+
+      const resolved = (configuredParser as any).getTool('arm-none-eabi-objdump');
+
+      assert.strictEqual(resolved, fullPath);
+    });
+
+    test('falls back to PATH when the configured binary is absent', () => {
+      const configuredParser = new MapElfParser(tempDir, false);
+
+      const resolved = (configuredParser as any).getTool('arm-none-eabi-objdump');
+
+      assert.strictEqual(resolved, 'arm-none-eabi-objdump');
+    });
+  });
+
+  suite('tool execution', () => {
+    test('returns stdout after a successful execution', () => {
+      const parserWithSuccessfulTool = new MapElfParser('', false, () => ({
+        pid: 1,
+        output: [],
+        stdout: Buffer.from('tool output'),
+        stderr: Buffer.alloc(0),
+        status: 0,
+        signal: null,
+      } as any));
+
+      const stdout = (parserWithSuccessfulTool as any)
+        .runTool('arm-none-eabi-objdump', [], 1024);
+
+      assert.strictEqual(stdout, 'tool output');
+    });
+
+    test('throws an actionable error when the tool cannot be spawned', () => {
+      const parserWithMissingTool = new MapElfParser('', false, () => ({
+        pid: 0,
+        output: [],
+        stdout: Buffer.alloc(0),
+        stderr: Buffer.alloc(0),
+        status: null,
+        signal: null,
+        error: new Error('spawn ENOENT'),
+      } as any));
+
+      assert.throws(
+        () => (parserWithMissingTool as any)
+          .runTool('arm-none-eabi-objdump', [], 1024),
+        (err: unknown) => {
+          assert.ok(err instanceof ToolExecutionError);
+          assert.strictEqual(err.tool, 'arm-none-eabi-objdump');
+          assert.match(err.message, /spawn ENOENT/);
+          assert.match(err.message, /configure stm32BuildAnalyzerEnhanced\.toolchainPath/i);
+          return true;
+        }
+      );
+    });
+
+    test('includes exit status and stderr in non-zero-exit errors', () => {
+      const parserWithFailingTool = new MapElfParser('', false, () => ({
+        pid: 1,
+        output: [],
+        stdout: Buffer.alloc(0),
+        stderr: Buffer.from('not an ELF file'),
+        status: 1,
+        signal: null,
+      } as any));
+
+      assert.throws(
+        () => (parserWithFailingTool as any)
+          .runTool('arm-none-eabi-objdump', [], 1024),
+        (err: unknown) => {
+          assert.ok(err instanceof ToolExecutionError);
+          assert.match(err.message, /exited with code 1/);
+          assert.match(err.message, /not an ELF file/);
+          return true;
+        }
+      );
+    });
+
+    test('rejects successful objdump output that cannot populate any region', () => {
+      const parserWithUnmatchedOutput = new MapElfParser('', false, () => ({
+        pid: 1,
+        output: [],
+        stdout: Buffer.from('Sections:\\nIdx Name Size VMA LMA'),
+        stderr: Buffer.alloc(0),
+        status: 0,
+        signal: null,
+      } as any));
+      const regions = [{
+        name: 'FLASH',
+        startAddress: 0x08000000,
+        size: 0x10000,
+        used: 0,
+        sections: [],
+      }];
+
+      assert.throws(
+        () => (parserWithUnmatchedOutput as any).parseSections('firmware.elf', regions),
+        /no allocatable ELF sections matched/
+      );
     });
   });
 });

@@ -1,4 +1,19 @@
 # Changelog
+## [1.1.7] – 2026-08-04
+
+### Fixed
+- Pass the resolved `toolchainPath` to the ELF parser so workspace-relative paths and `${userHome}`, `${workspaceFolder}`, and `${env:VAR}` variables work end to end.
+- Apply changes to toolchain, map, ELF, and manual-pair settings without requiring a VS Code window reload.
+- Reset tool discovery to `PATH` when `toolchainPath` is cleared.
+- Show actionable errors when `objdump` or `nm` cannot run or exits unsuccessfully instead of silently rendering `0 B` memory usage.
+- Warn when a configured toolchain directory is missing required binaries while preserving per-tool fallback to `PATH`.
+- Reject mismatched map/ELF pairs when no allocatable ELF sections match the map memory regions.
+
+### Changed
+- Debug logging configuration now takes effect without reloading the extension.
+- Added regression coverage for resolved toolchain wiring, tool fallback, execution failures, and required binary validation.
+- Corrected VSIX contents so compiled entry points and view icons are included while development-only files and dependencies are excluded.
+
 ## [1.1.6] – 2026-06-06
 
 ### Added

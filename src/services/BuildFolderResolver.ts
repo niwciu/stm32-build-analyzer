@@ -28,12 +28,14 @@ type BuildSelection =
   | { kind: 'auto'; folder: string };
 
 export class BuildFolderResolver {
-  private readonly debug: boolean;
   private workspaceRoot?: string;
   private autoDisplayNames = new Map<string, string>();
+  private lastToolchainWarning?: string;
 
-  constructor(private readonly context: vscode.ExtensionContext) {
-    this.debug = vscode.workspace
+  constructor(private readonly context: vscode.ExtensionContext) {}
+
+  private get debug(): boolean {
+    return vscode.workspace
       .getConfiguration('stm32BuildAnalyzerEnhanced')
       .get<boolean>('debug') ?? false;
   }
@@ -149,7 +151,10 @@ export class BuildFolderResolver {
     const cfg = vscode.workspace.getConfiguration('stm32BuildAnalyzerEnhanced');
     const raw = cfg.get<string>('toolchainPath');
 
-    if (!raw) {return undefined;}
+    if (!raw) {
+      this.lastToolchainWarning = undefined;
+      return undefined;
+    }
 
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const resolved = this.resolveCustomPath(this.resolveVariables(raw), workspaceRoot);
@@ -157,16 +162,25 @@ export class BuildFolderResolver {
 
     if (await this.exists(resolved)) {
       if (this.debug) {console.log(`[STM32] Using toolchain: ${resolved}`);}
+      this.lastToolchainWarning = undefined;
       return resolved;
     }
 
-    vscode.window.showWarningMessage(
+    this.showToolchainWarning(
       `STM32 Build Analyzer: toolchainPath not found: ${resolved}`
       + (resolved !== raw ? ` (resolved from: ${raw})` : '')
     );
     if (this.debug) {console.warn(`[STM32] Toolchain path not found: ${resolved}`);}
 
     return undefined;
+  }
+
+  private showToolchainWarning(message: string): void {
+    if (message === this.lastToolchainWarning) {
+      return;
+    }
+    this.lastToolchainWarning = message;
+    vscode.window.showWarningMessage(message);
   }
 
   private async exists(filePath: string): Promise<boolean> {

@@ -1,5 +1,6 @@
 .vscode/**
 .vscode-test/**
+.claude/**
 out/**
 node_modules/**
 src/**
@@ -7,9 +8,13 @@ src/**
 .yarnrc
 webpack.config.js
 vsc-extension-quickstart.md
+openvsx_cmd.txt
 **/tsconfig.json
 **/eslint.config.mjs
 **/*.map
 **/*.ts
 **/.vscode-test.*
-images/icon.png
+!dist/
+!dist/extension.js
+!dist/build-analyzer.bundle.js
+dist/*.map

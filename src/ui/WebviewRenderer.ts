@@ -13,13 +13,13 @@ function getNonce(): string {
 }
 
 export class WebviewRenderer {
-  private readonly debug: boolean;
-
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly view: vscode.WebviewView
-  ) {
-    this.debug = vscode.workspace
+  ) {}
+
+  private get debug(): boolean {
+    return vscode.workspace
       .getConfiguration('stm32BuildAnalyzerEnhanced')
       .get<boolean>('debug') ?? false;
   }

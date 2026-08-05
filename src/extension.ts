@@ -11,10 +11,7 @@ interface ManualBuildPair {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-  const cfg = vscode.workspace.getConfiguration('stm32BuildAnalyzerEnhanced');
-  const debug = cfg.get<boolean>('debug') ?? false;
-
-  if (debug) {
+  if (isDebugEnabled()) {
     console.log('[STM32 Extension] Activating extension...');
   }
 
@@ -22,34 +19,40 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('stm32BuildAnalyzerEnhanced.openTab', async () => {
-      if (debug) {console.log('[STM32 Extension] Command: openTab');}
+      if (isDebugEnabled()) {console.log('[STM32 Extension] Command: openTab');}
       await vscode.commands.executeCommand(
         'workbench.view.extension.buildAnalyzerEnhancedPanel'
       );
     }),
     vscode.commands.registerCommand('stm32BuildAnalyzerEnhanced.refresh', () => {
-      if (debug) {console.log('[STM32 Extension] Command: refresh');}
+      if (isDebugEnabled()) {console.log('[STM32 Extension] Command: refresh');}
       return provider.refresh();
     }),
 
     vscode.commands.registerCommand('stm32BuildAnalyzerEnhanced.refreshPaths', () => {
-      if (debug) {console.log('[STM32 Extension] Command: refreshPaths');}
+      if (isDebugEnabled()) {console.log('[STM32 Extension] Command: refreshPaths');}
       return provider.fullRefresh();
     }),
     vscode.commands.registerCommand('stm32BuildAnalyzerEnhanced.addManualPair', async () => {
-      if (debug) {console.log('[STM32 Extension] Command: addManualPair');}
-      await addManualPair(debug);
+      if (isDebugEnabled()) {console.log('[STM32 Extension] Command: addManualPair');}
+      await addManualPair();
     }),
 
     vscode.window.registerWebviewViewProvider('buildAnalyzerEnhanced', provider)
   );
 
-  if (debug) {
+  if (isDebugEnabled()) {
     console.log('[STM32 Extension] Commands and WebviewViewProvider registered.');
   }
 }
 
-async function addManualPair(debug: boolean) {
+function isDebugEnabled(): boolean {
+  return vscode.workspace
+    .getConfiguration('stm32BuildAnalyzerEnhanced')
+    .get<boolean>('debug') ?? false;
+}
+
+async function addManualPair() {
   const label = await vscode.window.showInputBox({
     prompt: 'Label for the build pair (optional)',
     placeHolder: 'Release build',
@@ -98,7 +101,7 @@ async function addManualPair(debug: boolean) {
   await cfg.update('manualBuildPairs', next, scopePick.target);
   vscode.window.showInformationMessage('STM32 Build Analyzer: manual pair added.');
 
-  if (debug) {
+  if (isDebugEnabled()) {
     console.log('[STM32 Extension] Manual pair added:', next[next.length - 1]);
   }
 }

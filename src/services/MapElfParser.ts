@@ -3,11 +3,31 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { Region, Section, SymbolEntry } from '../models';
+import { getToolFilename } from '../utils/toolchain';
+
+export class ToolExecutionError extends Error {
+  constructor(
+    public readonly tool: string,
+    public readonly command: string,
+    message: string
+  ) {
+    super(message);
+    this.name = 'ToolExecutionError';
+  }
+}
+
+export type ToolRunner = (
+  command: string,
+  args: readonly string[],
+  options: { maxBuffer: number }
+) => cp.SpawnSyncReturns<Buffer>;
 
 export class MapElfParser {
   constructor(
     private readonly toolchainPath: string,
-    private readonly debug: boolean = false
+    private readonly debug: boolean = false,
+    private readonly toolRunner: ToolRunner =
+      (command, args, options) => cp.spawnSync(command, args, options)
   ) {}
 
   public parse(mapPath: string, elfPath: string): Region[] {
@@ -137,20 +157,16 @@ export class MapElfParser {
   }
 
   private parseSections(elfFile: string, regions: Region[]): void {
-    const cmd = this.getTool('arm-none-eabi-objdump');
-    const out = cp.spawnSync(cmd, ['-h', elfFile], { maxBuffer: 8 * 1024 * 1024 });
-
-    if (out.error || out.status !== 0) {
-      if (this.debug) {
-        console.error(`[STM32 Parser] objdump error: ${out.error?.message ?? 'non-zero exit code'}`);
-      }
-      return;
-    }
-
-    const lines = out.stdout.toString().split('\n');
-    const secRx = /^\s*\d+\s+([\.\w]+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+([0-9a-f]+)/;
+    const stdout = this.runTool(
+      'arm-none-eabi-objdump',
+      ['-h', elfFile],
+      8 * 1024 * 1024
+    );
+    const lines = stdout.split('\n');
+    const secRx = /^\s*\d+\s+(\S+)\s+([0-9a-fA-F]+)\s+([0-9a-fA-F]+)\s+([0-9a-fA-F]+)/;
     const allocRx = /\bALLOC\b/;
     let prev = '';
+    let assignedSections = 0;
 
     for (const l of lines) {
       if (!allocRx.test(l)) { prev = l; continue; }
@@ -168,28 +184,30 @@ export class MapElfParser {
         if (addr >= rs && addr < re || (load >= rs && load < re && name === '.data')) {
           r.sections.push({ name, startAddress: addr, size, loadAddress: load, symbols: [] });
           r.used += size;
+          assignedSections++;
           if (this.debug) {
             console.log(`[STM32 Parser] Section ${name} assigned to region ${r.name}`);
           }
         }
       }
     }
+
+    if (regions.length > 0 && assignedSections === 0) {
+      throw new Error(
+        'STM32 Build Analyzer: objdump completed successfully, but no allocatable ELF sections '
+        + 'matched the map memory regions. Verify that the selected .map and .elf files belong '
+        + 'to the same build.'
+      );
+    }
   }
 
   private parseSymbols(elfFile: string, regions: Region[]): void {
-    const cmd = this.getTool('arm-none-eabi-nm');
-    const out = cp.spawnSync(
-      cmd,
+    const stdout = this.runTool(
+      'arm-none-eabi-nm',
       ['-C', '-S', '-n', '-l', '--defined-only', elfFile],
-      { maxBuffer: 32 * 1024 * 1024 }
+      32 * 1024 * 1024
     );
-
-    if (out.error || out.status !== 0) {
-      if (this.debug) {console.error(`[STM32 Parser] nm error: ${out.error?.message ?? 'non-zero exit code'}`);}
-      return;
-    }
-
-    const lines = out.stdout.toString().split('\n');
+    const lines = stdout.split('\n');
     const symRx = /^([0-9A-Fa-f]+)\s+([0-9A-Fa-f]+)?\s*\w\s+([^\t]*)\t*(\S*)/;
     const pathRx = /(.*):(\d+)$/;
     const unmatchedLines: string[] = [];
@@ -241,9 +259,46 @@ export class MapElfParser {
     }
   }
 
+  private runTool(exe: string, args: string[], maxBuffer: number): string {
+    const cmd = this.getTool(exe);
+    let out: cp.SpawnSyncReturns<Buffer>;
+
+    try {
+      out = this.toolRunner(cmd, args, { maxBuffer });
+    } catch (err: any) {
+      throw this.createToolExecutionError(exe, cmd, err?.message ?? String(err));
+    }
+
+    if (out.error || out.status !== 0) {
+      const reason = out.error?.message
+        ?? (out.signal
+          ? `terminated by signal ${out.signal}`
+          : `exited with code ${out.status ?? 'unknown'}`);
+      const stderr = out.stderr?.toString().trim().replace(/\s+/g, ' ');
+      const details = stderr
+        ? `${reason}; ${stderr.slice(0, 500)}`
+        : reason;
+      throw this.createToolExecutionError(exe, cmd, details);
+    }
+
+    return out.stdout?.toString() ?? '';
+  }
+
+  private createToolExecutionError(exe: string, cmd: string, details: string): ToolExecutionError {
+    const guidance = this.toolchainPath
+      ? 'Check stm32BuildAnalyzerEnhanced.toolchainPath and the configured toolchain binaries.'
+      : `Install ${exe}, add it to PATH, or configure stm32BuildAnalyzerEnhanced.toolchainPath.`;
+    const message = `STM32 Build Analyzer: failed to run ${exe} (${cmd}): ${details}. ${guidance}`;
+
+    if (this.debug) {
+      console.error(`[STM32 Parser] ${message}`);
+    }
+
+    return new ToolExecutionError(exe, cmd, message);
+  }
+
   private getTool(exe: string): string {
-    const suffix = process.platform === 'win32' ? '.exe' : '';
-    const full = path.join(this.toolchainPath, exe + suffix);
+    const full = path.join(this.toolchainPath, getToolFilename(exe));
     if (this.toolchainPath && fs.existsSync(full)) {
       if (this.debug) {console.log(`[STM32 Parser] Using tool: ${full}`);}
       return full;

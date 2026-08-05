@@ -68,13 +68,13 @@ This fork removes that dependency, adds broader file handling, and enhances the 
    ```
 3. Build the .vsix package using vsce:
    ```bash
-   vsce package
+   npm run vsix
    ```
-4. This will generate a file like: `stm32-build-analyzer-enhanced-1.1.6.vsix`
+4. This will generate a file like: `stm32-build-analyzer-enhanced-1.1.7.vsix`
 
 5. Install the extension in VS Code: 
    ```bash
-   code --install-extension stm32-build-analyzer-enhanced-1.1.6.vsix
+   code --install-extension stm32-build-analyzer-enhanced-1.1.7.vsix
    ```
 
 
@@ -103,16 +103,17 @@ The extension auto-detects `.map` + `.elf` files in common build folders. If you
 
 ### Toolchain path behavior
 
-When `toolchainPath` is set, the extension uses the `arm-none-eabi-objdump` and `arm-none-eabi-nm` binaries from that directory.  
-If it is **not** set (or the binaries are not found), it falls back to using those tools from your system `PATH`.
+When `toolchainPath` is set, the extension resolves variables and workspace-relative paths, then uses the `arm-none-eabi-objdump` and `arm-none-eabi-nm` binaries from that directory.
+If it is **not** set (or an individual binary is not found), the extension falls back to that tool from your system `PATH` and reports the fallback. Tool execution failures are shown as errors instead of displaying misleading `0 B` usage.
+Changes to path settings take effect automatically without reloading the VS Code window.
 
 ### Settings reference
 
 | Setting | Type | Default | Description |
 | --- | --- | --- | --- |
-| `stm32BuildAnalyzerEnhanced.mapFilePath` | string | `""` | Absolute path to the `.map` file (overrides automatic search). |
-| `stm32BuildAnalyzerEnhanced.elfFilePath` | string | `""` | Absolute path to the `.elf` file (overrides automatic search). |
-| `stm32BuildAnalyzerEnhanced.toolchainPath` | string | `""` | Absolute path to the ARM GNU Embedded toolchain binaries. |
+| `stm32BuildAnalyzerEnhanced.mapFilePath` | string | `""` | Absolute or workspace-relative path to the `.map` file. Supports `${userHome}`, `${workspaceFolder}`, and `${env:VAR}`. |
+| `stm32BuildAnalyzerEnhanced.elfFilePath` | string | `""` | Absolute or workspace-relative path to the `.elf` file. Supports `${userHome}`, `${workspaceFolder}`, and `${env:VAR}`. |
+| `stm32BuildAnalyzerEnhanced.toolchainPath` | string | `""` | Absolute or workspace-relative path to the ARM GNU Embedded toolchain binaries. Supports `${userHome}`, `${workspaceFolder}`, and `${env:VAR}`. |
 | `stm32BuildAnalyzerEnhanced.manualBuildPairs` | array | `[]` | List of manual map/elf pairs for builds with non-matching names or locations. |
 | `stm32BuildAnalyzerEnhanced.debug` | boolean | `false` | Enable verbose logging for debugging purposes. |
 

@@ -17,10 +17,10 @@ export class FileWatcherService {
     this.watcher = vscode.workspace.createFileSystemWatcher('**/*.{map,elf}');
     this.context.subscriptions.push(this.watcher);
 
-    const debug = vscode.workspace.getConfiguration('stm32BuildAnalyzerEnhanced').get<boolean>('debug');
-
     const wrappedHandler = (event: vscode.Uri) => {
-      if (debug) {
+      if (vscode.workspace
+        .getConfiguration('stm32BuildAnalyzerEnhanced')
+        .get<boolean>('debug')) {
         console.log(`[STM32 Build Analyzer] File event on: ${event.fsPath}`);
       }
       if (this.refreshTimer) {
