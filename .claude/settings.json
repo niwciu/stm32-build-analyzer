@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -rn \"\\\\${.*}\\\\|vscode.workspace.getConfiguration\\\\|workspace.fs\\\\|workspace.name\" /home/niwcu/EMBEDDED/7_VS_Code_extensions/stm32-build-analyzer/src --include=\"*.ts\" | grep -i \"toolchain\\\\|var\\\\|env\")",
+      "Read(//home/niwcu/EMBEDDED/7_VS_Code_extensions/stm32-build-analyzer/**)",
+      "Bash(grep -rn \"expandEnvironmentVariables\\\\|resolveWorkspaceFolder\\\\|\\\\${workspaceFolder}\\\\|\\\\${env:\" /home/niwciu/EMBEDDED/7_VS_Code_extensions/stm32-build-analyzer/src --include=\"*.ts\")",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(npm test *)"
+    ]
+  }
+}

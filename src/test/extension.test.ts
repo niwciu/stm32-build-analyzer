@@ -1,15 +1,24 @@
 import * as assert from 'assert';
-
-// You can import and use all API from the 'vscode' module
-// as well as import your extension to test it
 import * as vscode from 'vscode';
-// import * as myExtension from '../../extension';
 
-suite('Extension Test Suite', () => {
-	vscode.window.showInformationMessage('Start all tests.');
+suite('Extension', () => {
+  suiteSetup(async () => {
+    const ext = vscode.extensions.getExtension('niwciu.stm32-build-analyzer-enhanced');
+    if (ext && !ext.isActive) {
+      await ext.activate();
+    }
+  });
 
-	test('Sample test', () => {
-		assert.strictEqual(-1, [1, 2, 3].indexOf(5));
-		assert.strictEqual(-1, [1, 2, 3].indexOf(0));
-	});
+  test('all commands are registered', async () => {
+    const allCommands = await vscode.commands.getCommands(true);
+    const expected = [
+      'stm32BuildAnalyzerEnhanced.openTab',
+      'stm32BuildAnalyzerEnhanced.refresh',
+      'stm32BuildAnalyzerEnhanced.refreshPaths',
+      'stm32BuildAnalyzerEnhanced.addManualPair',
+    ];
+    for (const cmd of expected) {
+      assert.ok(allCommands.includes(cmd), `Command not registered: ${cmd}`);
+    }
+  });
 });
