@@ -106,6 +106,7 @@ The extension auto-detects `.map` + `.elf` files in common build folders. If you
 When `toolchainPath` is set, the extension resolves variables and workspace-relative paths, then uses the `arm-none-eabi-objdump` and `arm-none-eabi-nm` binaries from that directory.
 If it is **not** set (or an individual binary is not found), the extension falls back to that tool from your system `PATH` and reports the fallback. Tool execution failures are shown as errors instead of displaying misleading `0 B` usage.
 Changes to path settings take effect automatically without reloading the VS Code window.
+Unset environment variables and unknown named workspace folders are reported explicitly instead of being replaced with an empty string.
 
 ### Settings reference
 

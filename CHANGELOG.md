@@ -15,6 +15,7 @@
 - Run `objdump` and `nm` asynchronously with bounded output and a 30-second timeout so analysis cannot indefinitely block the extension host.
 - Synchronize selected webview rows by exact key comparison instead of embedding ELF-derived text in CSS selectors.
 - Scan every root in multi-root workspaces, deduplicate overlapping roots, resolve variables in manual pairs, and display paths relative to the owning workspace folder.
+- Report unset environment variables and unknown workspace-folder variables explicitly instead of silently replacing them or redirecting relative paths.
 - Apply changes to toolchain, map, ELF, and manual-pair settings without requiring a VS Code window reload.
 - Reset tool discovery to `PATH` when `toolchainPath` is cleared.
 - Show actionable errors when `objdump` or `nm` cannot run or exits unsuccessfully instead of silently rendering `0 B` memory usage.

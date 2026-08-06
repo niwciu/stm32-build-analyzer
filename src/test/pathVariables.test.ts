@@ -1,6 +1,9 @@
 import * as assert from 'assert';
 import * as os from 'os';
-import { resolveVariables } from '../utils/pathVariables';
+import {
+  findUnresolvedPathVariables,
+  resolveVariables,
+} from '../utils/pathVariables';
 
 suite('resolveVariables', () => {
 
@@ -30,11 +33,11 @@ suite('resolveVariables', () => {
       delete process.env._STM32_TEST_VAR;
     });
 
-    test('expands to empty string for an unset variable', () => {
+    test('leaves an unset variable unchanged for a clear diagnostic', () => {
       delete process.env._STM32_UNSET_VAR;
       assert.strictEqual(
         resolveVariables('${env:_STM32_UNSET_VAR}/bin'),
-        '/bin'
+        '${env:_STM32_UNSET_VAR}/bin'
       );
     });
 
@@ -47,6 +50,35 @@ suite('resolveVariables', () => {
       );
       delete process.env._STM32_A;
       delete process.env._STM32_B;
+    });
+  });
+
+  suite('unresolved variables', () => {
+    test('finds unresolved environment and workspace variables', () => {
+      assert.deepStrictEqual(
+        findUnresolvedPathVariables(
+          '${env:MISSING}/${workspaceFolder:Unknown}/${workspaceFolder}'
+        ),
+        [
+          '${env:MISSING}',
+          '${workspaceFolder:Unknown}',
+          '${workspaceFolder}',
+        ]
+      );
+    });
+
+    test('deduplicates repeated unresolved variables', () => {
+      assert.deepStrictEqual(
+        findUnresolvedPathVariables('${env:MISSING}/${env:MISSING}'),
+        ['${env:MISSING}']
+      );
+    });
+
+    test('ignores unrelated unsupported tokens', () => {
+      assert.deepStrictEqual(
+        findUnresolvedPathVariables('${someOtherToken}/bin'),
+        []
+      );
     });
   });
 

@@ -12,7 +12,10 @@ export function resolveVariables(
 ): string {
   value = value.replace(/\$\{userHome\}/g, os.homedir());
 
-  value = value.replace(/\$\{env:([^}]+)\}/g, (_, varName) => process.env[varName] ?? '');
+  value = value.replace(
+    /\$\{env:([^}]+)\}/g,
+    (match, varName) => process.env[varName] ?? match
+  );
 
   value = value.replace(/\$\{workspaceFolder:([^}]+)\}/g, (match, folderName: string) => {
     const folder = workspaceFolders.find(candidate => candidate.name === folderName);
@@ -24,4 +27,10 @@ export function resolveVariables(
   }
 
   return value;
+}
+
+export function findUnresolvedPathVariables(value: string): string[] {
+  return [...new Set(
+    value.match(/\$\{(?:env:[^}]+|workspaceFolder(?::[^}]+)?)\}/g) ?? []
+  )];
 }

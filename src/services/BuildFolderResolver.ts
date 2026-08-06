@@ -1,7 +1,10 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { resolveVariables as applyVariables } from '../utils/pathVariables';
+import {
+  findUnresolvedPathVariables,
+  resolveVariables as applyVariables,
+} from '../utils/pathVariables';
 import {
   discoverBuildPairsInRoots,
   DiscoveredBuildPair,
@@ -58,10 +61,16 @@ export class BuildFolderResolver {
 
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const resolvedCustomMap = customMap
-      ? this.resolveCustomPath(this.resolveVariables(customMap), workspaceRoot)
+      ? this.resolveCustomPath(
+        this.resolveRequiredVariables(customMap, 'mapFilePath'),
+        workspaceRoot
+      )
       : undefined;
     const resolvedCustomElf = customElf
-      ? this.resolveCustomPath(this.resolveVariables(customElf), workspaceRoot)
+      ? this.resolveCustomPath(
+        this.resolveRequiredVariables(customElf, 'elfFilePath'),
+        workspaceRoot
+      )
       : undefined;
 
     if (
@@ -154,7 +163,16 @@ export class BuildFolderResolver {
     }
 
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const resolved = this.resolveCustomPath(this.resolveVariables(raw), workspaceRoot);
+    const resolvedVariables = this.resolveVariables(raw);
+    const unresolved = findUnresolvedPathVariables(resolvedVariables);
+    if (unresolved.length > 0) {
+      this.showToolchainWarning(
+        `STM32 Build Analyzer: toolchainPath contains unresolved variable(s): `
+        + `${unresolved.join(', ')}. Check environment variables and workspace folder names.`
+      );
+      return undefined;
+    }
+    const resolved = this.resolveCustomPath(resolvedVariables, workspaceRoot);
     if (!resolved) {return undefined;}
 
     if (await this.exists(resolved)) {
@@ -212,6 +230,15 @@ export class BuildFolderResolver {
       const resolvedFolder = this.resolveVariables(pair.folder);
       const resolvedMap = this.resolveVariables(pair.map);
       const resolvedElf = this.resolveVariables(pair.elf);
+      const unresolved = findUnresolvedPathVariables(
+        `${resolvedFolder}\n${resolvedMap}\n${resolvedElf}`
+      );
+      if (unresolved.length > 0) {
+        throw new Error(
+          `STM32 Build Analyzer: manualBuildPairs entry "${pair.label ?? pair.folder}" `
+          + `contains unresolved variable(s): ${unresolved.join(', ')}.`
+        );
+      }
       const folderPath = path.isAbsolute(resolvedFolder)
         ? resolvedFolder
         : path.join(root, resolvedFolder);
@@ -254,6 +281,18 @@ export class BuildFolderResolver {
         path: folder.uri.fsPath,
       }))
     );
+  }
+
+  private resolveRequiredVariables(value: string, setting: string): string {
+    const resolved = this.resolveVariables(value);
+    const unresolved = findUnresolvedPathVariables(resolved);
+    if (unresolved.length > 0) {
+      throw new Error(
+        `STM32 Build Analyzer: ${setting} contains unresolved variable(s): `
+        + `${unresolved.join(', ')}. Check environment variables and workspace folder names.`
+      );
+    }
+    return resolved;
   }
 
   private resolveCustomPath(value: string, root?: string): string | undefined {
