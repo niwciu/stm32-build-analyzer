@@ -94,6 +94,20 @@
       color: var(--vscode-descriptionForeground);
     }
 
+    .analysis-status {
+      margin-bottom: 12px;
+      padding: 8px 10px;
+      border: 1px solid var(--vscode-inputValidation-errorBorder);
+      background: var(--vscode-inputValidation-errorBackground);
+      color: var(--vscode-inputValidation-errorForeground);
+      border-radius: 4px;
+      white-space: pre-wrap;
+    }
+
+    .analysis-status.is-hidden {
+      display: none;
+    }
+
     body.classic-view {
       margin: 0;
       padding: 16px;
@@ -466,6 +480,7 @@
   </div>
 
   <div id="scroll-container" style="height: 100%; overflow-y: auto;">
+    <div id="analysisStatus" class="analysis-status is-hidden" role="alert"></div>
     <div class="current-build-folder">
       <strong>Current Build Folder:</strong>
       <span id="buildFolderPath"></span>

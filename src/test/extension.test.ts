@@ -43,7 +43,10 @@ suite('Extension', () => {
         toolchainPath: resolvedToolchainPath,
       }),
     };
-    (provider as any).renderer = { showData: () => undefined };
+    (provider as any).renderer = {
+      showData: () => undefined,
+      showError: () => undefined,
+    };
 
     try {
       await provider.refresh();
@@ -51,6 +54,43 @@ suite('Extension', () => {
       await provider.fullRefresh();
 
       assert.deepStrictEqual(toolchainPaths, [`${root}/resolved-toolchain`, '']);
+    } finally {
+      provider.dispose();
+      subscriptions.forEach(disposable => disposable.dispose());
+    }
+  });
+
+  test('provider clears stale webview data and exposes refresh failures', async () => {
+    const subscriptions: vscode.Disposable[] = [];
+    const context = { subscriptions } as unknown as vscode.ExtensionContext;
+    const provider = new BuildAnalyzerProvider(
+      context,
+      () => ({
+        parse: () => {
+          throw new Error('objdump failed for test');
+        },
+      } as unknown as MapElfParser)
+    );
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+    let shownData = false;
+    let shownError: string | undefined;
+
+    (provider as any).resolver = {
+      resolve: async () => ({
+        map: `${root}/build/firmware.map`,
+        elf: `${root}/build/firmware.elf`,
+      }),
+    };
+    (provider as any).renderer = {
+      showData: () => { shownData = true; },
+      showError: (message: string) => { shownError = message; },
+    };
+
+    try {
+      await provider.refresh();
+
+      assert.strictEqual(shownData, false);
+      assert.strictEqual(shownError, 'objdump failed for test');
     } finally {
       provider.dispose();
       subscriptions.forEach(disposable => disposable.dispose());

@@ -67,6 +67,13 @@ export class WebviewRenderer {
     });
   }
 
+  public showError(message: string): void {
+    this.view.webview.postMessage({
+      command: 'showAnalysisError',
+      message,
+    });
+  }
+
   private async openFile(file: string, line: number, scrollTop?: number) {
     try {
       if (this.debug) {

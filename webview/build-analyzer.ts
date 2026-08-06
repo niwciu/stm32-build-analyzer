@@ -938,6 +938,15 @@ function renderTables(regions: Region[]): void {
     syncSelectionCheckboxes();
 }
 
+function showAnalysisStatus(message?: string): void {
+    const status = document.getElementById('analysisStatus');
+    if (!status) {
+        return;
+    }
+    status.textContent = message ?? '';
+    status.classList.toggle('is-hidden', !message);
+}
+
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     vscode.postMessage({ command: 'requestRefresh' });
@@ -1081,6 +1090,7 @@ window.addEventListener('message', (event: MessageEvent) => {
     switch (message.command) {
         case 'showMapData':
             lastRegions = message.data || [];
+            showAnalysisStatus();
             selectedKeys.clear();
             showSelectedOnly = false;
             renderTables(lastRegions);
@@ -1100,6 +1110,23 @@ window.addEventListener('message', (event: MessageEvent) => {
                 if (table) {
                     performSearch(searchInput.value.trim(), table);
                 }
+            }
+            break;
+        case 'showAnalysisError':
+            lastRegions = [];
+            expandedKeys.clear();
+            selectedKeys.clear();
+            selectedRowKey = null;
+            showSelectedOnly = false;
+            renderTables([]);
+            showAnalysisStatus(message.message || 'Build analysis failed.');
+            const failedBuildFolder = document.getElementById('buildFolderPath');
+            if (failedBuildFolder) {
+                failedBuildFolder.textContent = 'Analysis unavailable';
+            }
+            const selectionToggle = document.getElementById('toggleSelectionButton');
+            if (selectionToggle) {
+                selectionToggle.textContent = 'Show Selected';
             }
             break;
         case 'restoreScroll':

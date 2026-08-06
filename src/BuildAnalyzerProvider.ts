@@ -120,6 +120,7 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
     } catch (e: any) {
       const message = e.message || String(e);
+      this.renderer?.showError(message);
       if (message !== this.lastRefreshError) {
         this.lastRefreshError = message;
         vscode.window.showErrorMessage(message);
