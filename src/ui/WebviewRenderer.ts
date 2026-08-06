@@ -2,15 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Region } from '../models';
-
-function getNonce(): string {
-  let text = '';
-  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  for (let i = 0; i < 32; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  return text;
-}
+import { createNonce } from '../utils/nonce';
 
 export class WebviewRenderer {
   constructor(
@@ -111,7 +103,7 @@ export class WebviewRenderer {
     const webview = this.view.webview;
     const extensionPath = this.context.extensionPath;
 
-    const nonce = getNonce();
+    const nonce = createNonce();
     const csp = `default-src 'none'; img-src ${webview.cspSource} blob:; script-src 'nonce-${nonce}' ${webview.cspSource}; style-src ${webview.cspSource} 'unsafe-inline';`;
 
     const scriptUri = webview.asWebviewUri(
