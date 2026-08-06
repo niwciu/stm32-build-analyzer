@@ -21,6 +21,7 @@
 - Treat build-output Quick Pick cancellation as a user action, keep the previous selection, and avoid showing an error.
 - Keep rows only for the active webview table instead of building duplicate DOM trees for large symbol sets.
 - Generate webview Content Security Policy nonces from cryptographically secure random bytes.
+- Include webview TypeScript in the standard lint command.
 - Apply changes to toolchain, map, ELF, and manual-pair settings without requiring a VS Code window reload.
 - Reset tool discovery to `PATH` when `toolchainPath` is cleared.
 - Show actionable errors when `objdump` or `nm` cannot run or exits unsuccessfully instead of silently rendering `0 B` memory usage.
