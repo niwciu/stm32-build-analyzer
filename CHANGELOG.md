@@ -26,6 +26,7 @@
 - Replace the vulnerable VS Code test CLI dependency with a direct `@vscode/test-electron` runner and patched Mocha dependency chain.
 - Disable production source maps and exclude any stale map artifacts from packaged VSIX files.
 - Cancel superseded filesystem discovery and native tool processes when a newer refresh starts.
+- Enable unused-code, implicit-return, and switch-fallthrough TypeScript checks.
 - Apply changes to toolchain, map, ELF, and manual-pair settings without requiring a VS Code window reload.
 - Reset tool discovery to `PATH` when `toolchainPath` is cleared.
 - Show actionable errors when `objdump` or `nm` cannot run or exits unsuccessfully instead of silently rendering `0 B` memory usage.

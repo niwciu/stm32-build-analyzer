@@ -2,7 +2,7 @@ import * as cp from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { Region, Section, SymbolEntry } from '../models';
+import { Region } from '../models';
 import { getToolFilename } from '../utils/toolchain';
 import { AnalysisCancelledError } from '../utils/errors';
 
