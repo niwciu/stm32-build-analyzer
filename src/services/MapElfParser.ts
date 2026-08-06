@@ -62,7 +62,7 @@ export class MapElfParser {
     this.withElfCopy(elfPath, safeElf => {
       this.parseSections(safeElf, regions);
       try {
-        this.parseSymbols(safeElf, regions);
+        this.parseSymbols(safeElf, regions, path.dirname(elfPath));
       } catch (err) {
         if (err instanceof ToolExecutionError && err.tool === 'arm-none-eabi-nm') {
           this.analysisWarnings.push(
@@ -266,14 +266,18 @@ export class MapElfParser {
     }
   }
 
-  private parseSymbols(elfFile: string, regions: Region[]): void {
+  private parseSymbols(
+    elfFile: string,
+    regions: Region[],
+    sourceBaseDirectory: string = path.dirname(elfFile)
+  ): void {
     const stdout = this.runTool(
       'arm-none-eabi-nm',
       ['-C', '-S', '-n', '-l', '--defined-only', elfFile],
       32 * 1024 * 1024
     );
     const lines = stdout.split('\n');
-    const symRx = /^([0-9A-Fa-f]+)\s+([0-9A-Fa-f]+)?\s*\w\s+([^\t]*)\t*(\S*)/;
+    const symRx = /^([0-9A-Fa-f]+)(?:\s+([0-9A-Fa-f]+))?\s+\w\s+(.+)$/;
     const pathRx = /(.*):(\d+)$/;
     const unmatchedLines: string[] = [];
 
@@ -288,13 +292,22 @@ export class MapElfParser {
 
       const addr = parseInt(m[1], 16),
         size = isNaN(parseInt(m[2] || '0', 16)) ? 0 : parseInt(m[2]!, 16),
-        name = m[3],
-        raw = m[4] || '';
+        symbolDetails = m[3];
+      const separator = symbolDetails.lastIndexOf('\t');
+      const name = (separator >= 0
+        ? symbolDetails.slice(0, separator)
+        : symbolDetails
+      ).trim();
+      const raw = separator >= 0
+        ? symbolDetails.slice(separator + 1).trim()
+        : '';
       let file = '', row = 0;
 
       const pm = pathRx.exec(raw);
       if (pm) {
-        file = pm[1];
+        file = path.isAbsolute(pm[1])
+          ? path.normalize(pm[1])
+          : path.resolve(sourceBaseDirectory, pm[1]);
         row = parseInt(pm[2], 10);
       }
 

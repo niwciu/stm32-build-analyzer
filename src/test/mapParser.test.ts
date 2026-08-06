@@ -506,5 +506,82 @@ suite('MapElfParser', () => {
         fs.rmSync(tempElf, { force: true });
       }
     });
+
+    test('preserves demangled names and source paths containing spaces', () => {
+      const output = [
+        '08000000 00000010 T Namespace::Widget::operator new(unsigned long)\tsrc/generated files/widget.cpp:27',
+        '08000010 00000008 T symbol_without_source',
+      ].join('\n');
+      const parserWithSymbols = new MapElfParser('', false, () => ({
+        pid: 1,
+        output: [],
+        stdout: Buffer.from(output),
+        stderr: Buffer.alloc(0),
+        status: 0,
+        signal: null,
+      } as any));
+      const regions = [{
+        name: 'FLASH',
+        startAddress: 0x08000000,
+        size: 0x10000,
+        used: 0x20,
+        sections: [{
+          name: '.text',
+          startAddress: 0x08000000,
+          loadAddress: 0x08000000,
+          size: 0x20,
+          symbols: [],
+        }],
+      }];
+      const sourceBase = path.join(os.tmpdir(), 'firmware build');
+
+      (parserWithSymbols as any).parseSymbols('firmware.elf', regions, sourceBase);
+
+      const symbols = regions[0].sections[0].symbols as any[];
+      assert.strictEqual(
+        symbols[0].name,
+        'Namespace::Widget::operator new(unsigned long)'
+      );
+      assert.strictEqual(
+        symbols[0].path,
+        path.resolve(sourceBase, 'src/generated files/widget.cpp')
+      );
+      assert.strictEqual(symbols[0].row, 27);
+      assert.strictEqual(symbols[1].name, 'symbol_without_source');
+      assert.strictEqual(symbols[1].path, '');
+    });
+
+    test('keeps absolute source paths unchanged', () => {
+      const absoluteSource = path.join(os.tmpdir(), 'source folder', 'main.cpp');
+      const output =
+        `08000000 00000010 T main\t${absoluteSource}:12`;
+      const parserWithSymbols = new MapElfParser('', false, () => ({
+        pid: 1,
+        output: [],
+        stdout: Buffer.from(output),
+        stderr: Buffer.alloc(0),
+        status: 0,
+        signal: null,
+      } as any));
+      const regions = [{
+        name: 'FLASH',
+        startAddress: 0x08000000,
+        size: 0x10000,
+        used: 0x10,
+        sections: [{
+          name: '.text',
+          startAddress: 0x08000000,
+          loadAddress: 0x08000000,
+          size: 0x10,
+          symbols: [],
+        }],
+      }];
+
+      (parserWithSymbols as any).parseSymbols('firmware.elf', regions, '/another/base');
+
+      const symbol = regions[0].sections[0].symbols[0] as any;
+      assert.strictEqual(symbol.path, path.normalize(absoluteSource));
+      assert.strictEqual(symbol.row, 12);
+    });
   });
 });
