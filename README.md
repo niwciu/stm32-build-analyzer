@@ -107,6 +107,7 @@ When `toolchainPath` is set, the extension resolves variables and workspace-rela
 If it is **not** set (or an individual binary is not found), the extension falls back to that tool from your system `PATH` and reports the fallback. Tool execution failures are shown as errors instead of displaying misleading `0 B` usage.
 Changes to path settings take effect automatically without reloading the VS Code window.
 Unset environment variables and unknown named workspace folders are reported explicitly instead of being replaced with an empty string.
+`mapFilePath` and `elfFilePath` must be configured together; invalid explicit or manual paths are reported instead of being silently replaced by automatic discovery.
 
 ### Settings reference
 

@@ -10,6 +10,7 @@ import {
   DiscoveredBuildPair,
 } from '../utils/buildDiscovery';
 import { UserCancelledError } from '../utils/errors';
+import { assertCustomBuildPairComplete } from '../utils/customBuildPaths';
 
 export interface BuildPaths {
   map: string;
@@ -50,6 +51,7 @@ export class BuildFolderResolver {
     const customMap = cfg.get<string>('mapFilePath');
     const customElf = cfg.get<string>('elfFilePath');
     const manualPairs = cfg.get<ManualBuildPair[]>('manualBuildPairs') ?? [];
+    assertCustomBuildPairComplete(customMap, customElf);
 
     if (this.debug) {
       console.log('[STM32] Resolving build paths...');
@@ -74,12 +76,21 @@ export class BuildFolderResolver {
       )
       : undefined;
 
-    if (
-      resolvedCustomMap
-      && resolvedCustomElf
-      && await this.exists(resolvedCustomMap)
-      && await this.exists(resolvedCustomElf)
-    ) {
+    if (resolvedCustomMap && resolvedCustomElf) {
+      const [mapExists, elfExists] = await Promise.all([
+        this.exists(resolvedCustomMap),
+        this.exists(resolvedCustomElf),
+      ]);
+      if (!mapExists || !elfExists) {
+        const missing = [
+          !mapExists ? `mapFilePath: ${resolvedCustomMap}` : undefined,
+          !elfExists ? `elfFilePath: ${resolvedCustomElf}` : undefined,
+        ].filter((value): value is string => Boolean(value));
+        throw new Error(
+          `STM32 Build Analyzer: configured build file(s) are not accessible: `
+          + missing.join('; ')
+        );
+      }
       if (this.debug) {console.log('[STM32] Using custom paths from settings.');}
       return {
         map: resolvedCustomMap,
@@ -226,10 +237,13 @@ export class BuildFolderResolver {
   private async resolveManualPairs(root: string, pairs: ManualBuildPair[]): Promise<ResolvedBuildPair[]> {
     const resolved: ResolvedBuildPair[] = [];
 
-    for (const pair of pairs) {
+    for (const [index, pair] of pairs.entries()) {
+      const entryName = pair.label || `#${index + 1}`;
       if (!pair.folder || !pair.map || !pair.elf) {
-        if (this.debug) {console.warn('[STM32] Skipping invalid manual pair entry.');}
-        continue;
+        throw new Error(
+          `STM32 Build Analyzer: manualBuildPairs entry "${entryName}" must define `
+          + 'folder, map, and elf.'
+        );
       }
 
       const resolvedFolder = this.resolveVariables(pair.folder);
@@ -258,10 +272,10 @@ export class BuildFolderResolver {
       const elfOk = await this.exists(elfPath);
 
       if (!mapOk || !elfOk) {
-        if (this.debug) {
-          console.warn(`[STM32] Manual pair not accessible: ${mapPath} ${elfPath}`);
-        }
-        continue;
+        throw new Error(
+          `STM32 Build Analyzer: manualBuildPairs entry "${entryName}" is not accessible: `
+          + `${!mapOk ? mapPath : ''}${!mapOk && !elfOk ? '; ' : ''}${!elfOk ? elfPath : ''}`
+        );
       }
 
       resolved.push({
