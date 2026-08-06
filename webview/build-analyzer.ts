@@ -1,6 +1,10 @@
 // Build Analyzer Webview Script
 // This script runs inside the VS Code webview
 import { findByKey } from '../src/utils/keyLookup';
+import {
+    calculateUsagePercent,
+    clampProgressPercent,
+} from '../src/utils/usage';
 
 declare function acquireVsCodeApi(): {
     postMessage(message: unknown): void;
@@ -127,7 +131,8 @@ function fillTableRegions(regions: Region[], tableBody: HTMLTableSectionElement,
         id++;
         const regionId = id;
         const regionKey = buildRegionKey(region);
-        const percent = region.used / region.size * 100;
+        const percent = calculateUsagePercent(region.used, region.size);
+        const progressWidth = clampProgressPercent(percent);
 
         const tableTr = document.createElement('tr');
         tableTr.className = 'toggleTr level-1';
@@ -145,7 +150,7 @@ function fillTableRegions(regions: Region[], tableBody: HTMLTableSectionElement,
         bar.className = 'bar';
         const progress = document.createElement('div');
         progress.setAttribute('style', `
-            width: ${percent}%; 
+            width: ${progressWidth}%;
             background-color: ${percent > 95 ? 'var(--vscode-minimap-errorHighlight)' : 
                              percent > 75 ? 'var(--vscode-minimap-warningHighlight)' : 
                              'var(--vscode-minimap-infoHighlight)'}; 
