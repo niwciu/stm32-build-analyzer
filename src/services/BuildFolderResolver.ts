@@ -9,6 +9,7 @@ import {
   discoverBuildPairsInRoots,
   DiscoveredBuildPair,
 } from '../utils/buildDiscovery';
+import { UserCancelledError } from '../utils/errors';
 
 export interface BuildPaths {
   map: string;
@@ -134,7 +135,7 @@ export class BuildFolderResolver {
         { placeHolder: 'Select build output or manual map/elf pair' }
       );
       if (!pick) {
-        throw new Error('Build folder selection cancelled');
+        throw new UserCancelledError('Build output selection cancelled');
       }
       selection = pick.selection;
     }

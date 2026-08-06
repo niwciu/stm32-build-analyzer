@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { BuildAnalyzerProvider } from '../BuildAnalyzerProvider';
 import { MapElfParser } from '../services/MapElfParser';
+import { UserCancelledError } from '../utils/errors';
 
 suite('Extension', () => {
   suiteSetup(async () => {
@@ -91,6 +92,39 @@ suite('Extension', () => {
 
       assert.strictEqual(shownData, false);
       assert.strictEqual(shownError, 'objdump failed for test');
+    } finally {
+      provider.dispose();
+      subscriptions.forEach(disposable => disposable.dispose());
+    }
+  });
+
+  test('cancelling build selection keeps the previous paths without showing an error', async () => {
+    const subscriptions: vscode.Disposable[] = [];
+    const context = { subscriptions } as unknown as vscode.ExtensionContext;
+    const provider = new BuildAnalyzerProvider(context);
+    const previousPaths = {
+      map: '/workspace/build/previous.map',
+      elf: '/workspace/build/previous.elf',
+      toolchainPath: '/toolchain/bin',
+    };
+    let shownError: string | undefined;
+
+    (provider as any).paths = previousPaths;
+    (provider as any).resolver = {
+      resolve: async () => {
+        throw new UserCancelledError('Build output selection cancelled');
+      },
+    };
+    (provider as any).renderer = {
+      showData: () => undefined,
+      showError: (message: string) => { shownError = message; },
+    };
+
+    try {
+      await provider.fullRefresh();
+
+      assert.strictEqual((provider as any).paths, previousPaths);
+      assert.strictEqual(shownError, undefined);
     } finally {
       provider.dispose();
       subscriptions.forEach(disposable => disposable.dispose());

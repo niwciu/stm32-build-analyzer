@@ -6,8 +6,10 @@ import { MapElfParser } from './services/MapElfParser';
 import { WebviewRenderer } from './ui/WebviewRenderer';
 import { findMissingToolchainBinaries } from './utils/toolchain';
 import { assertWorkspaceTrusted } from './utils/workspaceTrust';
+import { UserCancelledError } from './utils/errors';
 
 export type MapElfParserFactory = (toolchainPath: string, debug: boolean) => MapElfParser;
+type RefreshOutcome = 'success' | 'cancelled' | 'superseded' | 'failed';
 
 export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
   private watcher: FileWatcherService;
@@ -76,7 +78,7 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
   }
 
   /** Fast refresh – parses using cached paths */
-  public async refresh() {
+  public async refresh(): Promise<RefreshOutcome> {
     try {
       if (this.debug) {console.log('[STM32 Provider] Refresh triggered');}
 
@@ -88,7 +90,7 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         if (this.debug) {
           console.log('[STM32 Provider] Ignoring paths resolved from stale configuration.');
         }
-        return;
+        return 'superseded';
       }
       this.paths = paths;
       this.watcher.watchFiles([paths.map, paths.elf]);
@@ -99,13 +101,13 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
       await this.warnAboutMissingToolchainBinaries(paths.toolchainPath);
       if (generation !== this.pathConfigurationGeneration) {
-        return;
+        return 'superseded';
       }
 
       const parser = this.parserFactory(paths.toolchainPath ?? '', this.debug);
       const regions = await parser.parse(paths.map, paths.elf);
       if (generation !== this.pathConfigurationGeneration) {
-        return;
+        return 'superseded';
       }
 
       const root = vscode.workspace
@@ -124,8 +126,15 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
       if (this.debug) {
         console.log(`[STM32 Provider] Parsed ${regions.length} region(s)`);
       }
+      return 'success';
 
     } catch (e: any) {
+      if (e instanceof UserCancelledError) {
+        if (this.debug) {
+          console.log(`[STM32 Provider] ${e.message}`);
+        }
+        return 'cancelled';
+      }
       const message = e.message || String(e);
       this.renderer?.showError(message);
       if (message !== this.lastRefreshError) {
@@ -135,14 +144,20 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
       if (this.debug) {
         console.error('[STM32 Provider] Error during refresh:', e);
       }
+      return 'failed';
     }
   }
 
   /** Full refresh – clears cache and forces reselection of build folder */
   public async fullRefresh() {
     if (this.debug) {console.log('[STM32 Provider] Full refresh requested.');}
+    const previousPaths = this.paths;
     this.invalidatePaths();
-    await this.refresh();
+    const outcome = await this.refresh();
+    if (outcome === 'cancelled' && previousPaths && !this.paths) {
+      this.paths = previousPaths;
+      this.watcher.watchFiles([previousPaths.map, previousPaths.elf]);
+    }
   }
 
   dispose(): void {
