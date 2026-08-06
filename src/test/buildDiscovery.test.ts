@@ -2,7 +2,10 @@ import * as assert from 'assert';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { discoverBuildPairs } from '../utils/buildDiscovery';
+import {
+  discoverBuildPairs,
+  discoverBuildPairsInRoots,
+} from '../utils/buildDiscovery';
 
 suite('build output discovery', () => {
   let root: string;
@@ -65,5 +68,30 @@ suite('build output discovery', () => {
     } finally {
       await fs.promises.rm(outside, { recursive: true, force: true });
     }
+  });
+
+  test('discovers outputs from every workspace root', async () => {
+    const applicationRoot = path.join(root, 'application');
+    const bootloaderRoot = path.join(root, 'bootloader');
+    await writePair(path.join(applicationRoot, 'build'), 'application');
+    await writePair(path.join(bootloaderRoot, 'build'), 'bootloader');
+
+    const pairs = await discoverBuildPairsInRoots([applicationRoot, bootloaderRoot]);
+
+    assert.deepStrictEqual(
+      pairs.map(pair => pair.label).sort(),
+      ['application', 'bootloader']
+    );
+  });
+
+  test('deduplicates outputs when workspace roots overlap', async () => {
+    const projectRoot = path.join(root, 'project');
+    const buildRoot = path.join(projectRoot, 'build');
+    await writePair(buildRoot, 'firmware');
+
+    const pairs = await discoverBuildPairsInRoots([projectRoot, buildRoot]);
+
+    assert.strictEqual(pairs.length, 1);
+    assert.strictEqual(pairs[0].map, path.join(buildRoot, 'firmware.map'));
   });
 });

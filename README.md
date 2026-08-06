@@ -98,7 +98,7 @@ The extension auto-detects `.map` + `.elf` files in common build folders. If you
 ### How auto-detection works
 
 1. If **both** `mapFilePath` and `elfFilePath` are set and point to readable files, the extension uses them directly and skips scanning.
-2. Otherwise, it asynchronously scans the workspace for `.map` and `.elf` files with the same basename and treats each matching pair as a build output. Directory symlinks and common dependency/tooling folders are skipped.
+2. Otherwise, it asynchronously scans every root in a multi-root workspace for `.map` and `.elf` files with the same basename and treats each matching pair as a build output. Directory symlinks and common dependency/tooling folders are skipped.
 3. If multiple pairs are found, you will be prompted to pick the build output (or a manual pair). Configure a manual pair when the MAP and ELF names differ.
 
 ### Toolchain path behavior
@@ -114,7 +114,7 @@ Changes to path settings take effect automatically without reloading the VS Code
 | `stm32BuildAnalyzerEnhanced.mapFilePath` | string | `""` | Absolute or workspace-relative path to the `.map` file. Supports `${userHome}`, `${workspaceFolder}`, `${workspaceFolder:Name}`, and `${env:VAR}`. |
 | `stm32BuildAnalyzerEnhanced.elfFilePath` | string | `""` | Absolute or workspace-relative path to the `.elf` file. Supports `${userHome}`, `${workspaceFolder}`, `${workspaceFolder:Name}`, and `${env:VAR}`. |
 | `stm32BuildAnalyzerEnhanced.toolchainPath` | string | `""` | Absolute or workspace-relative path to the ARM GNU Embedded toolchain binaries. Supports `${userHome}`, `${workspaceFolder}`, `${workspaceFolder:Name}`, and `${env:VAR}`. |
-| `stm32BuildAnalyzerEnhanced.manualBuildPairs` | array | `[]` | List of manual map/elf pairs for builds with non-matching names or locations. |
+| `stm32BuildAnalyzerEnhanced.manualBuildPairs` | array | `[]` | List of manual map/elf pairs for builds with non-matching names or locations. Path fields support the same variables as the individual path settings. |
 | `stm32BuildAnalyzerEnhanced.debug` | boolean | `false` | Enable verbose logging for debugging purposes. |
 
 ### Manual map/elf pairs

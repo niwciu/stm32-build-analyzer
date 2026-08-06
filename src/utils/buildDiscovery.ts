@@ -80,3 +80,19 @@ export async function discoverBuildPairs(
     a.folder.localeCompare(b.folder) || a.label.localeCompare(b.label)
   );
 }
+
+export async function discoverBuildPairsInRoots(
+  roots: readonly string[]
+): Promise<DiscoveredBuildPair[]> {
+  const perRoot = await Promise.all(roots.map(root => discoverBuildPairs(root)));
+  const unique = new Map<string, DiscoveredBuildPair>();
+
+  perRoot.flat().forEach(pair => {
+    const key = `${path.normalize(pair.map)}\0${path.normalize(pair.elf)}`;
+    unique.set(key, pair);
+  });
+
+  return [...unique.values()].sort((a, b) =>
+    a.folder.localeCompare(b.folder) || a.label.localeCompare(b.label)
+  );
+}

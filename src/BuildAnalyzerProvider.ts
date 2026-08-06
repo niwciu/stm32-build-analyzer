@@ -26,7 +26,7 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
       (toolchainPath, debug) => new MapElfParser(toolchainPath, debug)
   ) {
     this.watcher  = new FileWatcherService(() => this.refresh());
-    this.resolver = new BuildFolderResolver(context);
+    this.resolver = new BuildFolderResolver();
     this.configurationDisposable = vscode.workspace.onDidChangeConfiguration(event => {
       if (!this.affectsBuildConfiguration(event)) {
         return;
@@ -108,7 +108,10 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const root = vscode.workspace
+        .getWorkspaceFolder(vscode.Uri.file(paths.map))
+        ?.uri.fsPath
+        ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!root) {
         throw new Error('No workspace open to resolve relative paths');
       }

@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { resolveVariables as applyVariables } from '../utils/pathVariables';
 import {
-  discoverBuildPairs,
+  discoverBuildPairsInRoots,
   DiscoveredBuildPair,
 } from '../utils/buildDiscovery';
 
@@ -32,10 +32,8 @@ type BuildSelection =
   | { kind: 'auto'; pair: ResolvedBuildPair };
 
 export class BuildFolderResolver {
-  private workspaceRoot?: string;
+  private workspaceRoots: Array<{ name: string; path: string }> = [];
   private lastToolchainWarning?: string;
-
-  constructor(private readonly context: vscode.ExtensionContext) {}
 
   private get debug(): boolean {
     return vscode.workspace
@@ -86,12 +84,21 @@ export class BuildFolderResolver {
     }
 
     const root = workspaceFolders[0].uri.fsPath;
-    this.workspaceRoot = root;
+    this.workspaceRoots = workspaceFolders.map(folder => ({
+      name: folder.name,
+      path: folder.uri.fsPath,
+    }));
 
-    if (this.debug) {console.log(`[STM32] Scanning workspace folder: ${root}`);}
+    if (this.debug) {
+      this.workspaceRoots.forEach(folder =>
+        console.log(`[STM32] Scanning workspace folder: ${folder.path}`)
+      );
+    }
 
     const resolvedManualPairs = await this.resolveManualPairs(root, manualPairs);
-    const autoPairs = await this.findBuildPairs(root);
+    const autoPairs = await this.findBuildPairs(
+      this.workspaceRoots.map(folder => folder.path)
+    );
     const selections = this.buildSelections(resolvedManualPairs, autoPairs);
     if (selections.length === 0) {
       throw new Error(
@@ -183,8 +190,8 @@ export class BuildFolderResolver {
     }
   }
 
-  private async findBuildPairs(root: string): Promise<ResolvedBuildPair[]> {
-    const found: DiscoveredBuildPair[] = await discoverBuildPairs(root);
+  private async findBuildPairs(roots: readonly string[]): Promise<ResolvedBuildPair[]> {
+    const found: DiscoveredBuildPair[] = await discoverBuildPairsInRoots(roots);
     if (this.debug) {
       found.forEach(pair =>
         console.log(`[STM32] Found build pair: ${pair.map} + ${pair.elf}`)
@@ -202,15 +209,18 @@ export class BuildFolderResolver {
         continue;
       }
 
-      const folderPath = path.isAbsolute(pair.folder)
-        ? pair.folder
-        : path.join(root, pair.folder);
-      const mapPath = path.isAbsolute(pair.map)
-        ? pair.map
-        : path.join(folderPath, pair.map);
-      const elfPath = path.isAbsolute(pair.elf)
-        ? pair.elf
-        : path.join(folderPath, pair.elf);
+      const resolvedFolder = this.resolveVariables(pair.folder);
+      const resolvedMap = this.resolveVariables(pair.map);
+      const resolvedElf = this.resolveVariables(pair.elf);
+      const folderPath = path.isAbsolute(resolvedFolder)
+        ? resolvedFolder
+        : path.join(root, resolvedFolder);
+      const mapPath = path.isAbsolute(resolvedMap)
+        ? resolvedMap
+        : path.join(folderPath, resolvedMap);
+      const elfPath = path.isAbsolute(resolvedElf)
+        ? resolvedElf
+        : path.join(folderPath, resolvedElf);
 
       const mapOk = await this.exists(mapPath);
       const elfOk = await this.exists(elfPath);
@@ -268,11 +278,17 @@ export class BuildFolderResolver {
 
   private toQuickPick(selection: BuildSelection): vscode.QuickPickItem & { selection: BuildSelection } {
     const resolveRelative = (value: string) => {
-      if (!this.workspaceRoot) {
+      const workspace = this.workspaceRoots.find(folder => {
+        const relative = path.relative(folder.path, value);
+        return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+      });
+      if (!workspace) {
         return value;
       }
-      const relative = path.relative(this.workspaceRoot, value);
-      return relative || path.basename(value);
+      const relative = path.relative(workspace.path, value) || path.basename(value);
+      return this.workspaceRoots.length > 1
+        ? `${workspace.name}/${relative}`
+        : relative;
     };
 
     if (selection.kind === 'manual') {

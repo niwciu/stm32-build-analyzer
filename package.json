@@ -76,7 +76,7 @@
         "stm32BuildAnalyzerEnhanced.manualBuildPairs": {
           "type": "array",
           "default": [],
-          "description": "Optional list of manual map/elf pairs to use when file names differ or outputs live outside standard build folders.",
+          "description": "Optional list of manual map/elf pairs to use when file names differ or outputs live outside standard build folders. Path fields support ${userHome}, ${workspaceFolder}, ${workspaceFolder:Name}, and ${env:VAR}.",
           "items": {
             "type": "object",
             "required": [
