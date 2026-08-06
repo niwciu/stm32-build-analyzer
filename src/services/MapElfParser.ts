@@ -165,6 +165,8 @@ export class MapElfParser {
     const lines = stdout.split('\n');
     const secRx = /^\s*\d+\s+(\S+)\s+([0-9a-fA-F]+)\s+([0-9a-fA-F]+)\s+([0-9a-fA-F]+)/;
     const allocRx = /\bALLOC\b/;
+    const loadRx = /\bLOAD\b/;
+    const contentsRx = /\bCONTENTS\b/;
     let prev = '';
     let assignedSections = 0;
 
@@ -179,16 +181,17 @@ export class MapElfParser {
         load = parseInt(m[4], 16);
       if (size === 0) { continue; }
 
-      for (const r of regions) {
-        const rs = r.startAddress, re = rs + r.size;
-        if (addr >= rs && addr < re || (load >= rs && load < re && name === '.data')) {
-          r.sections.push({ name, startAddress: addr, size, loadAddress: load, symbols: [] });
-          r.used += size;
-          assignedSections++;
-          if (this.debug) {
-            console.log(`[STM32 Parser] Section ${name} assigned to region ${r.name}`);
-          }
-        }
+      const runtimeRegion = this.findRegion(regions, addr);
+      if (runtimeRegion) {
+        this.addSection(runtimeRegion, name, addr, load, size, 'runtime');
+        assignedSections++;
+      }
+
+      const hasLoadImage = load !== addr && loadRx.test(l) && contentsRx.test(l);
+      const loadRegion = hasLoadImage ? this.findRegion(regions, load) : undefined;
+      if (loadRegion) {
+        this.addSection(loadRegion, name, load, load, size, 'load');
+        assignedSections++;
       }
     }
 
@@ -197,6 +200,29 @@ export class MapElfParser {
         'STM32 Build Analyzer: objdump completed successfully, but no allocatable ELF sections '
         + 'matched the map memory regions. Verify that the selected .map and .elf files belong '
         + 'to the same build.'
+      );
+    }
+  }
+
+  private findRegion(regions: Region[], address: number): Region | undefined {
+    return regions.find(region =>
+      address >= region.startAddress && address < region.startAddress + region.size
+    );
+  }
+
+  private addSection(
+    region: Region,
+    name: string,
+    startAddress: number,
+    loadAddress: number,
+    size: number,
+    placement: 'runtime' | 'load'
+  ): void {
+    region.sections.push({ name, startAddress, size, loadAddress, symbols: [] });
+    region.used += size;
+    if (this.debug) {
+      console.log(
+        `[STM32 Parser] Section ${name} ${placement} image assigned to region ${region.name}`
       );
     }
   }

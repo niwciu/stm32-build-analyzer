@@ -319,5 +319,103 @@ suite('MapElfParser', () => {
         /no allocatable ELF sections matched/
       );
     });
+
+    test('counts initialized RAM sections in both runtime and load regions', () => {
+      const output = [
+        'Sections:',
+        'Idx Name          Size      VMA       LMA       File off  Algn',
+        '  0 .ramfunc      00000020  20000000  08000100  00000100  2**2',
+        '                  CONTENTS, ALLOC, LOAD, READONLY, CODE',
+        '  1 .data.extra   00000010  20000020  08000120  00000120  2**2',
+        '                  CONTENTS, ALLOC, LOAD, DATA',
+      ].join('\n');
+      const parserWithSections = new MapElfParser('', false, () => ({
+        pid: 1,
+        output: [],
+        stdout: Buffer.from(output),
+        stderr: Buffer.alloc(0),
+        status: 0,
+        signal: null,
+      } as any));
+      const regions = [
+        {
+          name: 'FLASH',
+          startAddress: 0x08000000,
+          size: 0x10000,
+          used: 0,
+          sections: [],
+        },
+        {
+          name: 'RAM',
+          startAddress: 0x20000000,
+          size: 0x10000,
+          used: 0,
+          sections: [],
+        },
+      ];
+
+      (parserWithSections as any).parseSections('firmware.elf', regions);
+
+      assert.strictEqual(regions[0].used, 0x30);
+      assert.strictEqual(regions[1].used, 0x30);
+      assert.deepStrictEqual(
+        regions[0].sections.map((section: any) => [section.name, section.startAddress]),
+        [
+          ['.ramfunc', 0x08000100],
+          ['.data.extra', 0x08000120],
+        ]
+      );
+      assert.deepStrictEqual(
+        regions[1].sections.map((section: any) => [section.name, section.startAddress]),
+        [
+          ['.ramfunc', 0x20000000],
+          ['.data.extra', 0x20000020],
+        ]
+      );
+    });
+
+    test('does not count BSS or NOLOAD-style sections in Flash', () => {
+      const output = [
+        'Sections:',
+        'Idx Name          Size      VMA       LMA       File off  Algn',
+        '  0 .bss          00000040  20000000  20000000  00000100  2**2',
+        '                  ALLOC',
+        '  1 .noinit       00000020  20000040  08000200  00000140  2**2',
+        '                  ALLOC',
+      ].join('\n');
+      const parserWithSections = new MapElfParser('', false, () => ({
+        pid: 1,
+        output: [],
+        stdout: Buffer.from(output),
+        stderr: Buffer.alloc(0),
+        status: 0,
+        signal: null,
+      } as any));
+      const regions = [
+        {
+          name: 'FLASH',
+          startAddress: 0x08000000,
+          size: 0x10000,
+          used: 0,
+          sections: [],
+        },
+        {
+          name: 'RAM',
+          startAddress: 0x20000000,
+          size: 0x10000,
+          used: 0,
+          sections: [],
+        },
+      ];
+
+      (parserWithSections as any).parseSections('firmware.elf', regions);
+
+      assert.strictEqual(regions[0].used, 0);
+      assert.strictEqual(regions[1].used, 0x60);
+      assert.deepStrictEqual(
+        regions[1].sections.map((section: any) => section.name),
+        ['.bss', '.noinit']
+      );
+    });
   });
 });
