@@ -11,6 +11,7 @@
 - Reject mismatched map/ELF pairs when no allocatable ELF sections match the map memory regions.
 
 ### Changed
+- Disable native tool execution in untrusted workspaces and mark `toolchainPath` as a restricted workspace setting.
 - Debug logging configuration now takes effect without reloading the extension.
 - Added regression coverage for resolved toolchain wiring, tool fallback, execution failures, and required binary validation.
 - Corrected VSIX contents so compiled entry points and view icons are included while development-only files and dependencies are excluded.

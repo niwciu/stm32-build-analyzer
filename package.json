@@ -12,6 +12,15 @@
   "categories": [
     "Other"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Build analysis is disabled until the workspace is trusted because the extension executes native objdump and nm tools.",
+      "restrictedConfigurations": [
+        "stm32BuildAnalyzerEnhanced.toolchainPath"
+      ]
+    }
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/niwciu/stm32-build-analyzer.git"

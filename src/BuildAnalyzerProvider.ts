@@ -5,6 +5,7 @@ import { BuildFolderResolver, BuildPaths } from './services/BuildFolderResolver'
 import { MapElfParser } from './services/MapElfParser';
 import { WebviewRenderer } from './ui/WebviewRenderer';
 import { findMissingToolchainBinaries } from './utils/toolchain';
+import { assertWorkspaceTrusted } from './utils/workspaceTrust';
 
 export type MapElfParserFactory = (toolchainPath: string, debug: boolean) => MapElfParser;
 
@@ -17,6 +18,7 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
   private lastMissingToolWarning?: string;
   private lastRefreshError?: string;
   private readonly configurationDisposable: vscode.Disposable;
+  private readonly workspaceTrustDisposable: vscode.Disposable;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -36,6 +38,13 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
       }
     });
     this.context.subscriptions.push(this.configurationDisposable);
+    this.workspaceTrustDisposable = vscode.workspace.onDidGrantWorkspaceTrust(() => {
+      this.invalidatePaths();
+      if (this.renderer) {
+        void this.refresh();
+      }
+    });
+    this.context.subscriptions.push(this.workspaceTrustDisposable);
 
     this.watcher.start();
 
@@ -70,6 +79,8 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
   public async refresh() {
     try {
       if (this.debug) {console.log('[STM32 Provider] Refresh triggered');}
+
+      assertWorkspaceTrusted(vscode.workspace.isTrusted);
 
       const generation = this.pathConfigurationGeneration;
       const paths = this.paths ?? await this.resolver.resolve();
@@ -128,6 +139,7 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
   dispose(): void {
     this.configurationDisposable.dispose();
+    this.workspaceTrustDisposable.dispose();
     this.watcher.dispose();
     if (this.debug) {console.log('[STM32 Provider] Disposed.');}
   }
