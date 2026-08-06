@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { resolveVariables as applyVariables } from '../utils/pathVariables';
+import { pairBuildOutputNames } from '../utils/buildPairs';
 
 export interface BuildPaths {
   map: string;
@@ -25,11 +26,10 @@ interface ResolvedBuildPair {
 
 type BuildSelection =
   | { kind: 'manual'; pair: ResolvedBuildPair }
-  | { kind: 'auto'; folder: string };
+  | { kind: 'auto'; pair: ResolvedBuildPair };
 
 export class BuildFolderResolver {
   private workspaceRoot?: string;
-  private autoDisplayNames = new Map<string, string>();
   private lastToolchainWarning?: string;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
@@ -88,14 +88,13 @@ export class BuildFolderResolver {
     if (this.debug) {console.log(`[STM32] Scanning workspace folder: ${root}`);}
 
     const resolvedManualPairs = await this.resolveManualPairs(root, manualPairs);
-    const folders = await this.findBuildFolders(root);
-    this.autoDisplayNames = new Map();
-    folders.forEach(folder => {
-      this.autoDisplayNames.set(folder, this.getBuildDisplayName(folder));
-    });
-    const selections = this.buildSelections(resolvedManualPairs, folders);
+    const autoPairs = await this.findBuildPairs(root);
+    const selections = this.buildSelections(resolvedManualPairs, autoPairs);
     if (selections.length === 0) {
-      throw new Error('No build folders containing both .map and .elf found');
+      throw new Error(
+        'No matching .map/.elf build outputs found. Automatic discovery requires '
+        + 'the same basename; configure a manual pair when output names differ.'
+      );
     }
 
     let selection = selections[0];
@@ -106,7 +105,7 @@ export class BuildFolderResolver {
           if (s.kind === 'manual') {
             console.log(` → Manual: ${s.pair.folder}`);
           } else {
-            console.log(` → Auto: ${s.folder}`);
+            console.log(` → Auto: ${s.pair.map} + ${s.pair.elf}`);
           }
         });
       }
@@ -121,28 +120,16 @@ export class BuildFolderResolver {
       selection = pick.selection;
     }
 
-    if (selection.kind === 'manual') {
-      if (this.debug) {
-        console.log(`[STM32] Selected manual pair: ${selection.pair.map} + ${selection.pair.elf}`);
-      }
-      return {
-        map: selection.pair.map,
-        elf: selection.pair.elf,
-        toolchainPath: await this.getToolchainPath(),
-      };
-    }
-
-    if (this.debug) {console.log(`[STM32] Selected folder: ${selection.folder}`);}
-
-    const mapFile = await this.findFile(selection.folder, '.map');
-    const elfFile = await this.findFile(selection.folder, '.elf');
-    if (!mapFile || !elfFile) {
-      throw new Error(`Missing .map or .elf in ${selection.folder}`);
+    if (this.debug) {
+      console.log(
+        `[STM32] Selected ${selection.kind} pair: `
+        + `${selection.pair.map} + ${selection.pair.elf}`
+      );
     }
 
     return {
-      map: mapFile,
-      elf: elfFile,
+      map: selection.pair.map,
+      elf: selection.pair.elf,
       toolchainPath: await this.getToolchainPath(),
     };
   }
@@ -193,8 +180,8 @@ export class BuildFolderResolver {
     }
   }
 
-  private async findBuildFolders(root: string): Promise<string[]> {
-    const found = new Set<string>();
+  private async findBuildPairs(root: string): Promise<ResolvedBuildPair[]> {
+    const found: ResolvedBuildPair[] = [];
     const ignored = new Set(['node_modules', '.git', '.vscode', 'dist']);
     const visited = new Set<string>();
 
@@ -206,8 +193,8 @@ export class BuildFolderResolver {
         }
         visited.add(realPath);
 
-        let hasMap = false, hasElf = false;
-        for (const d of fs.readdirSync(dir, { withFileTypes: true })) {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const d of entries) {
           const full = path.join(dir, d.name);
           if (d.isDirectory()) {
             if (!ignored.has(d.name)) {
@@ -222,15 +209,33 @@ export class BuildFolderResolver {
             } catch (err) {
               if (this.debug) {console.warn(`[STM32] Failed to stat symlink: ${full}`);}
             }
-          } else if (d.name.toLowerCase().endsWith('.map')) {
-            hasMap = true;
-          } else if (d.name.toLowerCase().endsWith('.elf')) {
-            hasElf = true;
           }
         }
-        if (hasMap && hasElf) {
-          if (this.debug) {console.log(`[STM32] Found build folder: ${dir}`);}
-          found.add(dir);
+
+        const files = entries.filter(entry => entry.isFile()).map(entry => entry.name);
+        for (const pair of pairBuildOutputNames(files)) {
+          const mapFile = path.join(dir, pair.map);
+          const elfFile = path.join(dir, pair.elf);
+          try {
+            fs.accessSync(mapFile, fs.constants.R_OK);
+            fs.accessSync(elfFile, fs.constants.R_OK);
+            if (fs.statSync(mapFile).size === 0) {
+              continue;
+            }
+            found.push({
+              folder: dir,
+              map: mapFile,
+              elf: elfFile,
+              label: pair.stem,
+            });
+            if (this.debug) {
+              console.log(`[STM32] Found build pair: ${mapFile} + ${elfFile}`);
+            }
+          } catch {
+            if (this.debug) {
+              console.warn(`[STM32] Build pair is not readable: ${mapFile} + ${elfFile}`);
+            }
+          }
         }
       } catch (err) {
         if (this.debug) {console.warn(`[STM32] Failed to access folder: ${dir}`);}
@@ -239,40 +244,9 @@ export class BuildFolderResolver {
 
     walk(root);
 
-    return Array.from(found);
-  }
-
-  private async findFile(folder: string, ext: string): Promise<string | undefined> {
-    const extLower = ext.toLowerCase();
-    const files = fs.readdirSync(folder).filter(f => f.toLowerCase().endsWith(extLower));
-    if (files.length === 0) {
-      if (this.debug) {console.warn(`[STM32] No ${ext} files in ${folder}`);}
-      return undefined;
-    }
-
-    files.sort((a, b) => {
-      if (a.includes('Release')) {return -1;}
-      if (b.includes('Release')) {return 1;}
-      if (a.includes('Debug')) {return -1;}
-      if (b.includes('Debug')) {return 1;}
-      return 0;
-    });
-
-    const p = path.join(folder, files[0]);
-
-    try {
-      fs.accessSync(p, fs.constants.R_OK);
-
-      if (ext === '.map' && fs.statSync(p).size === 0) {
-        throw new Error('Map file is empty');
-      }
-
-      if (this.debug) {console.log(`[STM32] Selected ${ext} file: ${p}`);}
-      return p;
-    } catch (err) {
-      if (this.debug) {console.warn(`[STM32] Could not use file: ${p}`);}
-      return undefined;
-    }
+    return found.sort((a, b) =>
+      a.folder.localeCompare(b.folder) || a.label.localeCompare(b.label)
+    );
   }
 
   private async resolveManualPairs(root: string, pairs: ManualBuildPair[]): Promise<ResolvedBuildPair[]> {
@@ -338,30 +312,14 @@ export class BuildFolderResolver {
     return path.join(root, value);
   }
 
-  private buildSelections(manualPairs: ResolvedBuildPair[], folders: string[]): BuildSelection[] {
+  private buildSelections(
+    manualPairs: ResolvedBuildPair[],
+    autoPairs: ResolvedBuildPair[]
+  ): BuildSelection[] {
     const selections: BuildSelection[] = [];
     manualPairs.forEach(pair => selections.push({ kind: 'manual', pair }));
-    folders.forEach(folder => selections.push({ kind: 'auto', folder }));
+    autoPairs.forEach(pair => selections.push({ kind: 'auto', pair }));
     return selections;
-  }
-
-  private getBuildDisplayName(folder: string): string {
-    try {
-      const files = fs.readdirSync(folder);
-      const elf = files.find(file => file.toLowerCase().endsWith('.elf'));
-      if (elf) {
-        return path.basename(elf).replace(/\.elf$/i, '');
-      }
-      const map = files.find(file => file.toLowerCase().endsWith('.map'));
-      if (map) {
-        return path.basename(map).replace(/\.map$/i, '');
-      }
-    } catch (err) {
-      if (this.debug) {
-        console.warn(`[STM32] Failed to read build folder: ${folder}`);
-      }
-    }
-    return path.basename(folder);
   }
 
   private toQuickPick(selection: BuildSelection): vscode.QuickPickItem & { selection: BuildSelection } {
@@ -383,11 +341,9 @@ export class BuildFolderResolver {
       };
     }
 
-    const displayName = this.autoDisplayNames.get(selection.folder) ?? this.getBuildDisplayName(selection.folder);
-
     return {
-      label: `$(file-binary) ${displayName}`,
-      detail: resolveRelative(selection.folder),
+      label: `$(file-binary) ${selection.pair.label}`,
+      detail: `${resolveRelative(selection.pair.elf)} | ${resolveRelative(selection.pair.map)}`,
       selection,
     };
   }

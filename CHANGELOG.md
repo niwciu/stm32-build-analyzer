@@ -4,6 +4,7 @@
 ### Fixed
 - Pass the resolved `toolchainPath` to the ELF parser so workspace-relative paths and `${userHome}`, `${workspaceFolder}`, and `${env:VAR}` variables work end to end.
 - Resolve named multi-root workspace variables such as `${workspaceFolder:Toolchain}` in toolchain, MAP, and ELF paths.
+- Pair automatically discovered MAP and ELF files by basename so outputs from different targets are never combined silently.
 - Apply changes to toolchain, map, ELF, and manual-pair settings without requiring a VS Code window reload.
 - Reset tool discovery to `PATH` when `toolchainPath` is cleared.
 - Show actionable errors when `objdump` or `nm` cannot run or exits unsuccessfully instead of silently rendering `0 B` memory usage.
