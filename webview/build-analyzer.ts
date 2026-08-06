@@ -6,6 +6,7 @@ import {
     clampProgressPercent,
 } from '../src/utils/usage';
 import { createTextMatcher } from '../src/utils/textSearch';
+import { createSingleViewRenderPlan } from '../src/utils/viewRendering';
 
 declare function acquireVsCodeApi(): {
     postMessage(message: unknown): void;
@@ -896,6 +897,7 @@ function setView(nextView: ViewMode): void {
     document.body.classList.toggle('table-view', currentView === 'table');
     viewConfigs.classic.container?.classList.toggle('is-hidden', currentView !== 'classic');
     viewConfigs.table.container?.classList.toggle('is-hidden', currentView !== 'table');
+    renderTables(lastRegions);
 
     const searchInput = document.getElementById('searchInput') as HTMLInputElement | null;
     if (searchInput && searchInput.value) {
@@ -915,16 +917,16 @@ function setView(nextView: ViewMode): void {
 
 function renderTables(regions: Region[]): void {
     const icons = getIconUris();
+    const views = Object.keys(viewConfigs) as ViewMode[];
+    const plan = createSingleViewRenderPlan(views, currentView);
+    plan.clear.forEach(view => resetTableRegions(viewConfigs[view].body));
 
-    (Object.keys(viewConfigs) as ViewMode[]).forEach(view => {
-        const config = viewConfigs[view];
-        if (!config.body) {
-            return;
-        }
+    const config = viewConfigs[plan.render];
+    if (config.body) {
         resetTableRegions(config.body);
         fillTableRegions(regions, config.body, icons);
-        updateSortIndicators(view, sortStates[view]);
-    });
+        updateSortIndicators(plan.render, sortStates[plan.render]);
+    }
     syncExpandedState();
     syncRowSelection();
     syncSelectionCheckboxes();
