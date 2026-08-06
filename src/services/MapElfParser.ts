@@ -4,6 +4,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { Region, Section, SymbolEntry } from '../models';
 import { getToolFilename } from '../utils/toolchain';
+import { AnalysisCancelledError } from '../utils/errors';
 
 export class ToolExecutionError extends Error {
   constructor(
@@ -19,7 +20,7 @@ export class ToolExecutionError extends Error {
 export type ToolRunner = (
   command: string,
   args: readonly string[],
-  options: { maxBuffer: number; timeoutMs: number }
+  options: { maxBuffer: number; timeoutMs: number; signal?: AbortSignal }
 ) => Promise<ToolRunResult>;
 
 export interface ToolRunResult {
@@ -35,9 +36,20 @@ const TOOL_TIMEOUT_MS = 30_000;
 export function spawnTool(
   command: string,
   args: readonly string[],
-  options: { maxBuffer: number; timeoutMs: number }
+  options: { maxBuffer: number; timeoutMs: number; signal?: AbortSignal }
 ): Promise<ToolRunResult> {
   return new Promise(resolve => {
+    if (options.signal?.aborted) {
+      resolve({
+        stdout: Buffer.alloc(0),
+        stderr: Buffer.alloc(0),
+        status: null,
+        signal: null,
+        error: new AnalysisCancelledError(),
+      });
+      return;
+    }
+
     let child: cp.ChildProcess;
     try {
       child = cp.spawn(command, [...args], {
@@ -67,6 +79,7 @@ export function spawnTool(
       }
       completed = true;
       clearTimeout(timeout);
+      options.signal?.removeEventListener('abort', abort);
       resolve(result);
     };
 
@@ -121,6 +134,10 @@ export function spawnTool(
     const timeout = setTimeout(() => {
       failAndKill(new Error(`timed out after ${options.timeoutMs} ms`));
     }, options.timeoutMs);
+    function abort(): void {
+      failAndKill(new AnalysisCancelledError());
+    }
+    options.signal?.addEventListener('abort', abort, { once: true });
   });
 }
 
@@ -137,7 +154,14 @@ export class MapElfParser {
     return this.analysisWarnings;
   }
 
-  public async parse(mapPath: string, elfPath: string): Promise<Region[]> {
+  public async parse(
+    mapPath: string,
+    elfPath: string,
+    signal?: AbortSignal
+  ): Promise<Region[]> {
+    if (signal?.aborted) {
+      throw new AnalysisCancelledError();
+    }
     this.analysisWarnings = [];
 
     if (this.debug) {
@@ -161,9 +185,9 @@ export class MapElfParser {
     // original handle-free; if the copy cannot be made we fall back to the
     // original so analysis still works (e.g. POSIX, where this is harmless).
     await this.withElfCopy(elfPath, async safeElf => {
-      await this.parseSections(safeElf, regions);
+      await this.parseSections(safeElf, regions, signal);
       try {
-        await this.parseSymbols(safeElf, regions, path.dirname(elfPath));
+        await this.parseSymbols(safeElf, regions, path.dirname(elfPath), signal);
       } catch (err) {
         if (err instanceof ToolExecutionError && err.tool === 'arm-none-eabi-nm') {
           this.analysisWarnings.push(
@@ -299,11 +323,16 @@ export class MapElfParser {
     return false;
   }
 
-  private async parseSections(elfFile: string, regions: Region[]): Promise<void> {
+  private async parseSections(
+    elfFile: string,
+    regions: Region[],
+    signal?: AbortSignal
+  ): Promise<void> {
     const stdout = await this.runTool(
       'arm-none-eabi-objdump',
       ['-h', elfFile],
-      8 * 1024 * 1024
+      8 * 1024 * 1024,
+      signal
     );
     const lines = stdout.split('\n');
     const secRx = /^\s*\d+\s+(\S+)\s+([0-9a-fA-F]+)\s+([0-9a-fA-F]+)\s+([0-9a-fA-F]+)/;
@@ -373,12 +402,14 @@ export class MapElfParser {
   private async parseSymbols(
     elfFile: string,
     regions: Region[],
-    sourceBaseDirectory: string = path.dirname(elfFile)
+    sourceBaseDirectory: string = path.dirname(elfFile),
+    signal?: AbortSignal
   ): Promise<void> {
     const stdout = await this.runTool(
       'arm-none-eabi-nm',
       ['-C', '-S', '-n', '-l', '--defined-only', elfFile],
-      32 * 1024 * 1024
+      32 * 1024 * 1024,
+      signal
     );
     const lines = stdout.split('\n');
     const symRx = /^([0-9A-Fa-f]+)(?:\s+([0-9A-Fa-f]+))?\s+\w\s+(.+)$/;
@@ -441,7 +472,12 @@ export class MapElfParser {
     }
   }
 
-  private async runTool(exe: string, args: string[], maxBuffer: number): Promise<string> {
+  private async runTool(
+    exe: string,
+    args: string[],
+    maxBuffer: number,
+    signal?: AbortSignal
+  ): Promise<string> {
     const cmd = this.getTool(exe);
     let out: ToolRunResult;
 
@@ -449,9 +485,14 @@ export class MapElfParser {
       out = await this.toolRunner(cmd, args, {
         maxBuffer,
         timeoutMs: TOOL_TIMEOUT_MS,
+        signal,
       });
     } catch (err: any) {
       throw this.createToolExecutionError(exe, cmd, err?.message ?? String(err));
+    }
+
+    if (out.error instanceof AnalysisCancelledError) {
+      throw out.error;
     }
 
     if (out.error || out.status !== 0) {

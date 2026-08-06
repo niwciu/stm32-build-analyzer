@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { pairBuildOutputNames } from './buildPairs';
+import { AnalysisCancelledError } from './errors';
 
 export interface DiscoveredBuildPair {
   folder: string;
@@ -20,12 +21,16 @@ const DEFAULT_IGNORED_DIRECTORIES = new Set([
 
 export async function discoverBuildPairs(
   root: string,
-  ignoredDirectories: ReadonlySet<string> = DEFAULT_IGNORED_DIRECTORIES
+  ignoredDirectories: ReadonlySet<string> = DEFAULT_IGNORED_DIRECTORIES,
+  signal?: AbortSignal
 ): Promise<DiscoveredBuildPair[]> {
   const found: DiscoveredBuildPair[] = [];
   const visited = new Set<string>();
 
   const walk = async (directory: string): Promise<void> => {
+    if (signal?.aborted) {
+      throw new AnalysisCancelledError();
+    }
     let realPath: string;
     let entries: fs.Dirent[];
     try {
@@ -36,6 +41,9 @@ export async function discoverBuildPairs(
       visited.add(realPath);
       entries = await fs.promises.readdir(directory, { withFileTypes: true });
     } catch {
+      if (signal?.aborted) {
+        throw new AnalysisCancelledError();
+      }
       return;
     }
 
@@ -51,6 +59,9 @@ export async function discoverBuildPairs(
 
     const files = entries.filter(entry => entry.isFile()).map(entry => entry.name);
     for (const pair of pairBuildOutputNames(files)) {
+      if (signal?.aborted) {
+        throw new AnalysisCancelledError();
+      }
       const mapFile = path.join(directory, pair.map);
       const elfFile = path.join(directory, pair.elf);
       try {
@@ -82,9 +93,12 @@ export async function discoverBuildPairs(
 }
 
 export async function discoverBuildPairsInRoots(
-  roots: readonly string[]
+  roots: readonly string[],
+  signal?: AbortSignal
 ): Promise<DiscoveredBuildPair[]> {
-  const perRoot = await Promise.all(roots.map(root => discoverBuildPairs(root)));
+  const perRoot = await Promise.all(
+    roots.map(root => discoverBuildPairs(root, DEFAULT_IGNORED_DIRECTORIES, signal))
+  );
   const unique = new Map<string, DiscoveredBuildPair>();
 
   perRoot.flat().forEach(pair => {

@@ -7,6 +7,7 @@ import {
   spawnTool,
   ToolExecutionError,
 } from '../services/MapElfParser';
+import { AnalysisCancelledError } from '../utils/errors';
 
 const SAMPLE_MAP = `
 Memory Configuration
@@ -310,6 +311,24 @@ suite('MapElfParser', () => {
       );
 
       assert.match(result.error?.message ?? '', /stdout exceeded 128 bytes/);
+    });
+
+    test('terminates a tool when a newer refresh cancels it', async () => {
+      const controller = new AbortController();
+      const resultPromise = spawnTool(
+        process.execPath,
+        ['-e', 'setTimeout(() => {}, 1000)'],
+        {
+          maxBuffer: 1024,
+          timeoutMs: 1000,
+          signal: controller.signal,
+        }
+      );
+      setTimeout(() => controller.abort(), 20);
+
+      const result = await resultPromise;
+
+      assert.ok(result.error instanceof AnalysisCancelledError);
     });
 
     test('returns stdout after a successful execution', async () => {

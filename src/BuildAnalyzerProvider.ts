@@ -6,7 +6,10 @@ import { MapElfParser } from './services/MapElfParser';
 import { WebviewRenderer } from './ui/WebviewRenderer';
 import { findMissingToolchainBinaries } from './utils/toolchain';
 import { assertWorkspaceTrusted } from './utils/workspaceTrust';
-import { UserCancelledError } from './utils/errors';
+import {
+  AnalysisCancelledError,
+  UserCancelledError,
+} from './utils/errors';
 
 export type MapElfParserFactory = (toolchainPath: string, debug: boolean) => MapElfParser;
 type RefreshOutcome = 'success' | 'cancelled' | 'superseded' | 'failed';
@@ -19,6 +22,8 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
   private pathConfigurationGeneration = 0;
   private lastMissingToolWarning?: string;
   private lastRefreshError?: string;
+  private activeRefresh?: AbortController;
+  private refreshGeneration = 0;
   private readonly configurationDisposable: vscode.Disposable;
   private readonly workspaceTrustDisposable: vscode.Disposable;
 
@@ -79,13 +84,21 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
   /** Fast refresh – parses using cached paths */
   public async refresh(): Promise<RefreshOutcome> {
+    const refreshGeneration = ++this.refreshGeneration;
+    this.activeRefresh?.abort();
+    const controller = new AbortController();
+    this.activeRefresh = controller;
+
     try {
       if (this.debug) {console.log('[STM32 Provider] Refresh triggered');}
 
       assertWorkspaceTrusted(vscode.workspace.isTrusted);
 
       const generation = this.pathConfigurationGeneration;
-      const paths = this.paths ?? await this.resolver.resolve();
+      const paths = this.paths ?? await this.resolver.resolve(controller.signal);
+      if (controller.signal.aborted || refreshGeneration !== this.refreshGeneration) {
+        return 'superseded';
+      }
       if (generation !== this.pathConfigurationGeneration) {
         if (this.debug) {
           console.log('[STM32 Provider] Ignoring paths resolved from stale configuration.');
@@ -105,7 +118,10 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
       }
 
       const parser = this.parserFactory(paths.toolchainPath ?? '', this.debug);
-      const regions = await parser.parse(paths.map, paths.elf);
+      const regions = await parser.parse(paths.map, paths.elf, controller.signal);
+      if (controller.signal.aborted || refreshGeneration !== this.refreshGeneration) {
+        return 'superseded';
+      }
       if (generation !== this.pathConfigurationGeneration) {
         return 'superseded';
       }
@@ -129,6 +145,9 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
       return 'success';
 
     } catch (e: any) {
+      if (e instanceof AnalysisCancelledError || controller.signal.aborted) {
+        return 'superseded';
+      }
       if (e instanceof UserCancelledError) {
         if (this.debug) {
           console.log(`[STM32 Provider] ${e.message}`);
@@ -145,6 +164,10 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         console.error('[STM32 Provider] Error during refresh:', e);
       }
       return 'failed';
+    } finally {
+      if (this.activeRefresh === controller) {
+        this.activeRefresh = undefined;
+      }
     }
   }
 
@@ -161,6 +184,7 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
   }
 
   dispose(): void {
+    this.activeRefresh?.abort();
     this.configurationDisposable.dispose();
     this.workspaceTrustDisposable.dispose();
     this.watcher.dispose();

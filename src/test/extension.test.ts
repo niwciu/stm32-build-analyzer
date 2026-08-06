@@ -2,7 +2,10 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { BuildAnalyzerProvider } from '../BuildAnalyzerProvider';
 import { MapElfParser } from '../services/MapElfParser';
-import { UserCancelledError } from '../utils/errors';
+import {
+  AnalysisCancelledError,
+  UserCancelledError,
+} from '../utils/errors';
 
 suite('Extension', () => {
   suiteSetup(async () => {
@@ -125,6 +128,63 @@ suite('Extension', () => {
 
       assert.strictEqual((provider as any).paths, previousPaths);
       assert.strictEqual(shownError, undefined);
+    } finally {
+      provider.dispose();
+      subscriptions.forEach(disposable => disposable.dispose());
+    }
+  });
+
+  test('a newer refresh cancels an older parser run silently', async () => {
+    const subscriptions: vscode.Disposable[] = [];
+    const context = { subscriptions } as unknown as vscode.ExtensionContext;
+    let parserCalls = 0;
+    let shownData = 0;
+    let shownError = 0;
+    const provider = new BuildAnalyzerProvider(
+      context,
+      () => ({
+        warnings: [],
+        parse: async (
+          _map: string,
+          _elf: string,
+          signal?: AbortSignal
+        ) => {
+          parserCalls++;
+          if (parserCalls === 1) {
+            await new Promise<void>((_resolve, reject) => {
+              signal?.addEventListener(
+                'abort',
+                () => reject(new AnalysisCancelledError()),
+                { once: true }
+              );
+            });
+          }
+          return [];
+        },
+      } as unknown as MapElfParser)
+    );
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+
+    (provider as any).resolver = {
+      resolve: async () => ({
+        map: `${root}/build/firmware.map`,
+        elf: `${root}/build/firmware.elf`,
+      }),
+    };
+    (provider as any).renderer = {
+      showData: () => { shownData++; },
+      showError: () => { shownError++; },
+    };
+
+    try {
+      const first = provider.refresh();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const second = provider.refresh();
+      const outcomes = await Promise.all([first, second]);
+
+      assert.deepStrictEqual(outcomes, ['superseded', 'success']);
+      assert.strictEqual(shownData, 1);
+      assert.strictEqual(shownError, 0);
     } finally {
       provider.dispose();
       subscriptions.forEach(disposable => disposable.dispose());

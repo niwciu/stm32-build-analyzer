@@ -45,7 +45,7 @@ export class BuildFolderResolver {
       .get<boolean>('debug') ?? false;
   }
 
-  public async resolve(): Promise<BuildPaths> {
+  public async resolve(signal?: AbortSignal): Promise<BuildPaths> {
     const cfg = vscode.workspace.getConfiguration('stm32BuildAnalyzerEnhanced');
     const customMap = cfg.get<string>('mapFilePath');
     const customElf = cfg.get<string>('elfFilePath');
@@ -107,7 +107,8 @@ export class BuildFolderResolver {
 
     const resolvedManualPairs = await this.resolveManualPairs(root, manualPairs);
     const autoPairs = await this.findBuildPairs(
-      this.workspaceRoots.map(folder => folder.path)
+      this.workspaceRoots.map(folder => folder.path),
+      signal
     );
     const selections = this.buildSelections(resolvedManualPairs, autoPairs);
     if (selections.length === 0) {
@@ -209,8 +210,11 @@ export class BuildFolderResolver {
     }
   }
 
-  private async findBuildPairs(roots: readonly string[]): Promise<ResolvedBuildPair[]> {
-    const found: DiscoveredBuildPair[] = await discoverBuildPairsInRoots(roots);
+  private async findBuildPairs(
+    roots: readonly string[],
+    signal?: AbortSignal
+  ): Promise<ResolvedBuildPair[]> {
+    const found: DiscoveredBuildPair[] = await discoverBuildPairsInRoots(roots, signal);
     if (this.debug) {
       found.forEach(pair =>
         console.log(`[STM32] Found build pair: ${pair.map} + ${pair.elf}`)

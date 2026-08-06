@@ -4,3 +4,10 @@ export class UserCancelledError extends Error {
     this.name = 'UserCancelledError';
   }
 }
+
+export class AnalysisCancelledError extends Error {
+  constructor(message = 'Analysis superseded by a newer refresh') {
+    super(message);
+    this.name = 'AnalysisCancelledError';
+  }
+}

@@ -6,6 +6,7 @@ import {
   discoverBuildPairs,
   discoverBuildPairsInRoots,
 } from '../utils/buildDiscovery';
+import { AnalysisCancelledError } from '../utils/errors';
 
 suite('build output discovery', () => {
   let root: string;
@@ -93,5 +94,15 @@ suite('build output discovery', () => {
 
     assert.strictEqual(pairs.length, 1);
     assert.strictEqual(pairs[0].map, path.join(buildRoot, 'firmware.map'));
+  });
+
+  test('stops discovery when its refresh is cancelled', async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    await assert.rejects(
+      discoverBuildPairs(root, undefined, controller.signal),
+      AnalysisCancelledError
+    );
   });
 });
