@@ -5,6 +5,7 @@ import {
     calculateUsagePercent,
     clampProgressPercent,
 } from '../src/utils/usage';
+import { createTextMatcher } from '../src/utils/textSearch';
 
 declare function acquireVsCodeApi(): {
     postMessage(message: unknown): void;
@@ -399,31 +400,11 @@ function performSearch(query: string, table: HTMLTableElement): void {
 
     let matcher: (text: string) => boolean;
     try {
-        if (useRegex) {
-            const flags = caseSensitive ? '' : 'i';
-            const pattern = wholeWord ? '\\b' + normalizedQuery + '\\b' : normalizedQuery;
-            const regex = new RegExp(pattern, flags);
-            matcher = (text: string) => regex.test(text);
-        } else {
-            const searchQuery = caseSensitive ? normalizedQuery : normalizedQuery.toLowerCase();
-            if (wholeWord) {
-                matcher = (text: string) => {
-                    const searchIn = caseSensitive ? text : text.toLowerCase();
-                    const idx = searchIn.indexOf(searchQuery);
-                    if (idx === -1) {
-                      return false;
-                    }
-                    const before = idx === 0 || !/[a-zA-Z0-9_]/.test(searchIn[idx - 1]);
-                    const after = idx + searchQuery.length >= searchIn.length || !/[a-zA-Z0-9_]/.test(searchIn[idx + searchQuery.length]);
-                    return before && after;
-                };
-            } else {
-                matcher = (text: string) => {
-                    const searchIn = caseSensitive ? text : text.toLowerCase();
-                    return searchIn.includes(searchQuery);
-                };
-            }
-        }
+        matcher = createTextMatcher(normalizedQuery, {
+            caseSensitive,
+            wholeWord,
+            useRegex
+        });
     } catch (e) {
         if (searchMatchCount) {
           searchMatchCount.textContent = 'Invalid regex';
