@@ -23,6 +23,7 @@
 - Generate webview Content Security Policy nonces from cryptographically secure random bytes.
 - Include webview TypeScript in the standard lint command.
 - Add CI for extension-host tests, linting/compilation, runtime dependency audit, production bundling, and VSIX content validation.
+- Replace the vulnerable VS Code test CLI dependency with a direct `@vscode/test-electron` runner and patched Mocha dependency chain.
 - Apply changes to toolchain, map, ELF, and manual-pair settings without requiring a VS Code window reload.
 - Reset tool discovery to `PATH` when `toolchainPath` is cleared.
 - Show actionable errors when `objdump` or `nm` cannot run or exits unsuccessfully instead of silently rendering `0 B` memory usage.
