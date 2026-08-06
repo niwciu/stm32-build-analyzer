@@ -2,7 +2,11 @@ import * as assert from 'assert';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { MapElfParser, ToolExecutionError } from '../services/MapElfParser';
+import {
+  MapElfParser,
+  spawnTool,
+  ToolExecutionError,
+} from '../services/MapElfParser';
 
 const SAMPLE_MAP = `
 Memory Configuration
@@ -181,7 +185,11 @@ suite('MapElfParser', () => {
   // of the ELF, never the build's own output file, so it can't keep a handle
   // open that blocks the next build from deleting/overwriting it on Windows.
   suite('withElfCopy', () => {
-    const withElfCopy = (p: MapElfParser, elf: string, fn: (elf: string) => void): void =>
+    const withElfCopy = (
+      p: MapElfParser,
+      elf: string,
+      fn: (elf: string) => Promise<void>
+    ): Promise<void> =>
       (p as any).withElfCopy(elf, fn);
 
     let elfFile: string;
@@ -195,52 +203,56 @@ suite('MapElfParser', () => {
       try { fs.unlinkSync(elfFile); } catch { /* ignore */ }
     });
 
-    test('passes a different path than the original ELF', () => {
+    test('passes a different path than the original ELF', async () => {
       let seen: string | undefined;
-      withElfCopy(parser, elfFile, p => { seen = p; });
+      await withElfCopy(parser, elfFile, async p => { seen = p; });
       assert.notStrictEqual(seen, elfFile);
     });
 
-    test('the copy exists during the callback', () => {
+    test('the copy exists during the callback', async () => {
       let existedDuring = false;
-      withElfCopy(parser, elfFile, p => { existedDuring = fs.existsSync(p); });
+      await withElfCopy(parser, elfFile, async p => { existedDuring = fs.existsSync(p); });
       assert.ok(existedDuring);
     });
 
-    test('the copy has the same bytes as the original', () => {
+    test('the copy has the same bytes as the original', async () => {
       const original = fs.readFileSync(elfFile);
       let copyContent: Buffer | undefined;
-      withElfCopy(parser, elfFile, p => { copyContent = fs.readFileSync(p); });
+      await withElfCopy(parser, elfFile, async p => { copyContent = fs.readFileSync(p); });
       assert.ok(copyContent && original.equals(copyContent));
     });
 
-    test('removes the copy after the callback returns', () => {
+    test('removes the copy after the callback returns', async () => {
       let copyPath: string | undefined;
-      withElfCopy(parser, elfFile, p => { copyPath = p; });
+      await withElfCopy(parser, elfFile, async p => { copyPath = p; });
       assert.ok(copyPath);
       assert.ok(!fs.existsSync(copyPath!));
     });
 
-    test('leaves the original ELF untouched', () => {
+    test('leaves the original ELF untouched', async () => {
       const before = fs.readFileSync(elfFile);
-      withElfCopy(parser, elfFile, () => { /* noop */ });
+      await withElfCopy(parser, elfFile, async () => { /* noop */ });
       assert.ok(fs.existsSync(elfFile));
       assert.ok(before.equals(fs.readFileSync(elfFile)));
     });
 
-    test('cleans up the copy even when the callback throws', () => {
+    test('cleans up the copy even when the callback throws', async () => {
       let copyPath: string | undefined;
-      assert.throws(() => {
-        withElfCopy(parser, elfFile, p => { copyPath = p; throw new Error('boom'); });
-      }, /boom/);
+      await assert.rejects(
+        withElfCopy(parser, elfFile, async p => {
+          copyPath = p;
+          throw new Error('boom');
+        }),
+        /boom/
+      );
       assert.ok(copyPath);
       assert.ok(!fs.existsSync(copyPath!));
     });
 
-    test('falls back to the original path when the ELF cannot be copied', () => {
+    test('falls back to the original path when the ELF cannot be copied', async () => {
       const missing = path.join(os.tmpdir(), `stm32-missing-${Date.now()}.elf`);
       let seen: string | undefined;
-      withElfCopy(parser, missing, p => { seen = p; });
+      await withElfCopy(parser, missing, async p => { seen = p; });
       assert.strictEqual(seen, missing);
     });
   });
@@ -277,8 +289,31 @@ suite('MapElfParser', () => {
   });
 
   suite('tool execution', () => {
-    test('returns stdout after a successful execution', () => {
-      const parserWithSuccessfulTool = new MapElfParser('', false, () => ({
+    test('terminates a tool that exceeds its timeout', async () => {
+      const result = await spawnTool(
+        process.execPath,
+        ['-e', 'setTimeout(() => {}, 1000)'],
+        { maxBuffer: 1024, timeoutMs: 20 }
+      );
+
+      assert.match(result.error?.message ?? '', /timed out after 20 ms/);
+    });
+
+    test('terminates a tool that exceeds the output limit', async function () {
+      if (process.platform === 'win32') {
+        this.skip();
+      }
+      const result = await spawnTool(
+        '/usr/bin/printf',
+        ['x'.repeat(2048)],
+        { maxBuffer: 128, timeoutMs: 1000 }
+      );
+
+      assert.match(result.error?.message ?? '', /stdout exceeded 128 bytes/);
+    });
+
+    test('returns stdout after a successful execution', async () => {
+      const parserWithSuccessfulTool = new MapElfParser('', false, async () => ({
         pid: 1,
         output: [],
         stdout: Buffer.from('tool output'),
@@ -287,14 +322,14 @@ suite('MapElfParser', () => {
         signal: null,
       } as any));
 
-      const stdout = (parserWithSuccessfulTool as any)
+      const stdout = await (parserWithSuccessfulTool as any)
         .runTool('arm-none-eabi-objdump', [], 1024);
 
       assert.strictEqual(stdout, 'tool output');
     });
 
-    test('throws an actionable error when the tool cannot be spawned', () => {
-      const parserWithMissingTool = new MapElfParser('', false, () => ({
+    test('throws an actionable error when the tool cannot be spawned', async () => {
+      const parserWithMissingTool = new MapElfParser('', false, async () => ({
         pid: 0,
         output: [],
         stdout: Buffer.alloc(0),
@@ -304,8 +339,8 @@ suite('MapElfParser', () => {
         error: new Error('spawn ENOENT'),
       } as any));
 
-      assert.throws(
-        () => (parserWithMissingTool as any)
+      await assert.rejects(
+        (parserWithMissingTool as any)
           .runTool('arm-none-eabi-objdump', [], 1024),
         (err: unknown) => {
           assert.ok(err instanceof ToolExecutionError);
@@ -317,8 +352,8 @@ suite('MapElfParser', () => {
       );
     });
 
-    test('includes exit status and stderr in non-zero-exit errors', () => {
-      const parserWithFailingTool = new MapElfParser('', false, () => ({
+    test('includes exit status and stderr in non-zero-exit errors', async () => {
+      const parserWithFailingTool = new MapElfParser('', false, async () => ({
         pid: 1,
         output: [],
         stdout: Buffer.alloc(0),
@@ -327,8 +362,8 @@ suite('MapElfParser', () => {
         signal: null,
       } as any));
 
-      assert.throws(
-        () => (parserWithFailingTool as any)
+      await assert.rejects(
+        (parserWithFailingTool as any)
           .runTool('arm-none-eabi-objdump', [], 1024),
         (err: unknown) => {
           assert.ok(err instanceof ToolExecutionError);
@@ -339,8 +374,8 @@ suite('MapElfParser', () => {
       );
     });
 
-    test('rejects successful objdump output that cannot populate any region', () => {
-      const parserWithUnmatchedOutput = new MapElfParser('', false, () => ({
+    test('rejects successful objdump output that cannot populate any region', async () => {
+      const parserWithUnmatchedOutput = new MapElfParser('', false, async () => ({
         pid: 1,
         output: [],
         stdout: Buffer.from('Sections:\\nIdx Name Size VMA LMA'),
@@ -356,13 +391,13 @@ suite('MapElfParser', () => {
         sections: [],
       }];
 
-      assert.throws(
-        () => (parserWithUnmatchedOutput as any).parseSections('firmware.elf', regions),
+      await assert.rejects(
+        (parserWithUnmatchedOutput as any).parseSections('firmware.elf', regions),
         /no allocatable ELF sections matched/
       );
     });
 
-    test('counts initialized RAM sections in both runtime and load regions', () => {
+    test('counts initialized RAM sections in both runtime and load regions', async () => {
       const output = [
         'Sections:',
         'Idx Name          Size      VMA       LMA       File off  Algn',
@@ -371,7 +406,7 @@ suite('MapElfParser', () => {
         '  1 .data.extra   00000010  20000020  08000120  00000120  2**2',
         '                  CONTENTS, ALLOC, LOAD, DATA',
       ].join('\n');
-      const parserWithSections = new MapElfParser('', false, () => ({
+      const parserWithSections = new MapElfParser('', false, async () => ({
         pid: 1,
         output: [],
         stdout: Buffer.from(output),
@@ -396,7 +431,7 @@ suite('MapElfParser', () => {
         },
       ];
 
-      (parserWithSections as any).parseSections('firmware.elf', regions);
+      await (parserWithSections as any).parseSections('firmware.elf', regions);
 
       assert.strictEqual(regions[0].used, 0x30);
       assert.strictEqual(regions[1].used, 0x30);
@@ -416,7 +451,7 @@ suite('MapElfParser', () => {
       );
     });
 
-    test('does not count BSS or NOLOAD-style sections in Flash', () => {
+    test('does not count BSS or NOLOAD-style sections in Flash', async () => {
       const output = [
         'Sections:',
         'Idx Name          Size      VMA       LMA       File off  Algn',
@@ -425,7 +460,7 @@ suite('MapElfParser', () => {
         '  1 .noinit       00000020  20000040  08000200  00000140  2**2',
         '                  ALLOC',
       ].join('\n');
-      const parserWithSections = new MapElfParser('', false, () => ({
+      const parserWithSections = new MapElfParser('', false, async () => ({
         pid: 1,
         output: [],
         stdout: Buffer.from(output),
@@ -450,7 +485,7 @@ suite('MapElfParser', () => {
         },
       ];
 
-      (parserWithSections as any).parseSections('firmware.elf', regions);
+      await (parserWithSections as any).parseSections('firmware.elf', regions);
 
       assert.strictEqual(regions[0].used, 0);
       assert.strictEqual(regions[1].used, 0x60);
@@ -460,13 +495,13 @@ suite('MapElfParser', () => {
       );
     });
 
-    test('preserves memory usage and warns when nm fails', () => {
+    test('preserves memory usage and warns when nm fails', async () => {
       const tempMap = path.join(os.tmpdir(), `stm32-partial-${Date.now()}.map`);
       const tempElf = path.join(os.tmpdir(), `stm32-partial-${Date.now()}.elf`);
       fs.writeFileSync(tempMap, SAMPLE_MAP, 'utf8');
       fs.writeFileSync(tempElf, 'fake elf', 'utf8');
       let call = 0;
-      const parserWithFailingNm = new MapElfParser('', false, () => {
+      const parserWithFailingNm = new MapElfParser('', false, async () => {
         call++;
         if (call === 1) {
           return {
@@ -494,7 +529,7 @@ suite('MapElfParser', () => {
       });
 
       try {
-        const regions = parserWithFailingNm.parse(tempMap, tempElf);
+        const regions = await parserWithFailingNm.parse(tempMap, tempElf);
         const flash = regions.find(region => region.name === 'FLASH');
 
         assert.strictEqual(flash?.used, 0x20);
@@ -507,12 +542,12 @@ suite('MapElfParser', () => {
       }
     });
 
-    test('preserves demangled names and source paths containing spaces', () => {
+    test('preserves demangled names and source paths containing spaces', async () => {
       const output = [
         '08000000 00000010 T Namespace::Widget::operator new(unsigned long)\tsrc/generated files/widget.cpp:27',
         '08000010 00000008 T symbol_without_source',
       ].join('\n');
-      const parserWithSymbols = new MapElfParser('', false, () => ({
+      const parserWithSymbols = new MapElfParser('', false, async () => ({
         pid: 1,
         output: [],
         stdout: Buffer.from(output),
@@ -535,7 +570,7 @@ suite('MapElfParser', () => {
       }];
       const sourceBase = path.join(os.tmpdir(), 'firmware build');
 
-      (parserWithSymbols as any).parseSymbols('firmware.elf', regions, sourceBase);
+      await (parserWithSymbols as any).parseSymbols('firmware.elf', regions, sourceBase);
 
       const symbols = regions[0].sections[0].symbols as any[];
       assert.strictEqual(
@@ -551,11 +586,11 @@ suite('MapElfParser', () => {
       assert.strictEqual(symbols[1].path, '');
     });
 
-    test('keeps absolute source paths unchanged', () => {
+    test('keeps absolute source paths unchanged', async () => {
       const absoluteSource = path.join(os.tmpdir(), 'source folder', 'main.cpp');
       const output =
         `08000000 00000010 T main\t${absoluteSource}:12`;
-      const parserWithSymbols = new MapElfParser('', false, () => ({
+      const parserWithSymbols = new MapElfParser('', false, async () => ({
         pid: 1,
         output: [],
         stdout: Buffer.from(output),
@@ -577,7 +612,7 @@ suite('MapElfParser', () => {
         }],
       }];
 
-      (parserWithSymbols as any).parseSymbols('firmware.elf', regions, '/another/base');
+      await (parserWithSymbols as any).parseSymbols('firmware.elf', regions, '/another/base');
 
       const symbol = regions[0].sections[0].symbols[0] as any;
       assert.strictEqual(symbol.path, path.normalize(absoluteSource));

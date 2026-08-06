@@ -19,8 +19,110 @@ export class ToolExecutionError extends Error {
 export type ToolRunner = (
   command: string,
   args: readonly string[],
-  options: { maxBuffer: number }
-) => cp.SpawnSyncReturns<Buffer>;
+  options: { maxBuffer: number; timeoutMs: number }
+) => Promise<ToolRunResult>;
+
+export interface ToolRunResult {
+  stdout: Buffer;
+  stderr: Buffer;
+  status: number | null;
+  signal: NodeJS.Signals | null;
+  error?: Error;
+}
+
+const TOOL_TIMEOUT_MS = 30_000;
+
+export function spawnTool(
+  command: string,
+  args: readonly string[],
+  options: { maxBuffer: number; timeoutMs: number }
+): Promise<ToolRunResult> {
+  return new Promise(resolve => {
+    let child: cp.ChildProcess;
+    try {
+      child = cp.spawn(command, [...args], {
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (error) {
+      resolve({
+        stdout: Buffer.alloc(0),
+        stderr: Buffer.alloc(0),
+        status: null,
+        signal: null,
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
+      return;
+    }
+
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    let stdoutSize = 0;
+    let stderrSize = 0;
+    let completed = false;
+
+    const finish = (result: ToolRunResult): void => {
+      if (completed) {
+        return;
+      }
+      completed = true;
+      clearTimeout(timeout);
+      resolve(result);
+    };
+
+    const failAndKill = (error: Error): void => {
+      child.kill();
+      finish({
+        stdout: Buffer.concat(stdout),
+        stderr: Buffer.concat(stderr),
+        status: null,
+        signal: null,
+        error,
+      });
+    };
+
+    child.stdout?.on('data', (chunk: Buffer) => {
+      stdoutSize += chunk.length;
+      if (stdoutSize > options.maxBuffer) {
+        failAndKill(new Error(`stdout exceeded ${options.maxBuffer} bytes`));
+        return;
+      }
+      stdout.push(chunk);
+    });
+
+    child.stderr?.on('data', (chunk: Buffer) => {
+      stderrSize += chunk.length;
+      if (stderrSize > options.maxBuffer) {
+        failAndKill(new Error(`stderr exceeded ${options.maxBuffer} bytes`));
+        return;
+      }
+      stderr.push(chunk);
+    });
+
+    child.once('error', error => {
+      finish({
+        stdout: Buffer.concat(stdout),
+        stderr: Buffer.concat(stderr),
+        status: null,
+        signal: null,
+        error,
+      });
+    });
+
+    child.once('close', (status, signal) => {
+      finish({
+        stdout: Buffer.concat(stdout),
+        stderr: Buffer.concat(stderr),
+        status,
+        signal,
+      });
+    });
+
+    const timeout = setTimeout(() => {
+      failAndKill(new Error(`timed out after ${options.timeoutMs} ms`));
+    }, options.timeoutMs);
+  });
+}
 
 export class MapElfParser {
   private analysisWarnings: string[] = [];
@@ -28,15 +130,14 @@ export class MapElfParser {
   constructor(
     private readonly toolchainPath: string,
     private readonly debug: boolean = false,
-    private readonly toolRunner: ToolRunner =
-      (command, args, options) => cp.spawnSync(command, args, options)
+    private readonly toolRunner: ToolRunner = spawnTool
   ) {}
 
   public get warnings(): readonly string[] {
     return this.analysisWarnings;
   }
 
-  public parse(mapPath: string, elfPath: string): Region[] {
+  public async parse(mapPath: string, elfPath: string): Promise<Region[]> {
     this.analysisWarnings = [];
 
     if (this.debug) {
@@ -59,10 +160,10 @@ export class MapElfParser {
     // deleting/overwriting it (issue #11). Working on a copy keeps the
     // original handle-free; if the copy cannot be made we fall back to the
     // original so analysis still works (e.g. POSIX, where this is harmless).
-    this.withElfCopy(elfPath, safeElf => {
-      this.parseSections(safeElf, regions);
+    await this.withElfCopy(elfPath, async safeElf => {
+      await this.parseSections(safeElf, regions);
       try {
-        this.parseSymbols(safeElf, regions, path.dirname(elfPath));
+        await this.parseSymbols(safeElf, regions, path.dirname(elfPath));
       } catch (err) {
         if (err instanceof ToolExecutionError && err.tool === 'arm-none-eabi-nm') {
           this.analysisWarnings.push(
@@ -83,16 +184,19 @@ export class MapElfParser {
    * caller always gets a usable path. The copy is read via fs (libuv opens
    * with share-delete semantics), so even creating it never blocks a build.
    */
-  private withElfCopy(elfPath: string, fn: (elf: string) => void): void {
+  private async withElfCopy(
+    elfPath: string,
+    fn: (elf: string) => Promise<void>
+  ): Promise<void> {
     let tempDir: string | undefined;
     let elfForTools = elfPath;
 
     try {
-      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stm32-build-analyzer-'));
+      tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'stm32-build-analyzer-'));
       const dest = path.join(tempDir, path.basename(elfPath));
       // readFileSync + writeFileSync (not copyFileSync) guarantees the
       // original is only opened with libuv's share-delete flags.
-      fs.writeFileSync(dest, fs.readFileSync(elfPath));
+      await fs.promises.writeFile(dest, await fs.promises.readFile(elfPath));
       elfForTools = dest;
       if (this.debug) {
         console.log(`[STM32 Parser] Analyzing ELF copy: ${dest}`);
@@ -102,24 +206,24 @@ export class MapElfParser {
         console.warn(`[STM32 Parser] Could not create ELF copy, using original: ${err?.message ?? err}`);
       }
       if (tempDir) {
-        this.removeTempDir(tempDir);
+        await this.removeTempDir(tempDir);
         tempDir = undefined;
       }
       elfForTools = elfPath;
     }
 
     try {
-      fn(elfForTools);
+      await fn(elfForTools);
     } finally {
       if (tempDir) {
-        this.removeTempDir(tempDir);
+        await this.removeTempDir(tempDir);
       }
     }
   }
 
-  private removeTempDir(dir: string): void {
+  private async removeTempDir(dir: string): Promise<void> {
     try {
-      fs.rmSync(dir, { recursive: true, force: true });
+      await fs.promises.rm(dir, { recursive: true, force: true });
     } catch (err: any) {
       if (this.debug) {
         console.warn(`[STM32 Parser] Failed to remove temp dir ${dir}: ${err?.message ?? err}`);
@@ -195,8 +299,8 @@ export class MapElfParser {
     return false;
   }
 
-  private parseSections(elfFile: string, regions: Region[]): void {
-    const stdout = this.runTool(
+  private async parseSections(elfFile: string, regions: Region[]): Promise<void> {
+    const stdout = await this.runTool(
       'arm-none-eabi-objdump',
       ['-h', elfFile],
       8 * 1024 * 1024
@@ -266,12 +370,12 @@ export class MapElfParser {
     }
   }
 
-  private parseSymbols(
+  private async parseSymbols(
     elfFile: string,
     regions: Region[],
     sourceBaseDirectory: string = path.dirname(elfFile)
-  ): void {
-    const stdout = this.runTool(
+  ): Promise<void> {
+    const stdout = await this.runTool(
       'arm-none-eabi-nm',
       ['-C', '-S', '-n', '-l', '--defined-only', elfFile],
       32 * 1024 * 1024
@@ -337,12 +441,15 @@ export class MapElfParser {
     }
   }
 
-  private runTool(exe: string, args: string[], maxBuffer: number): string {
+  private async runTool(exe: string, args: string[], maxBuffer: number): Promise<string> {
     const cmd = this.getTool(exe);
-    let out: cp.SpawnSyncReturns<Buffer>;
+    let out: ToolRunResult;
 
     try {
-      out = this.toolRunner(cmd, args, { maxBuffer });
+      out = await this.toolRunner(cmd, args, {
+        maxBuffer,
+        timeoutMs: TOOL_TIMEOUT_MS,
+      });
     } catch (err: any) {
       throw this.createToolExecutionError(exe, cmd, err?.message ?? String(err));
     }

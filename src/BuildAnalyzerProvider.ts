@@ -103,7 +103,10 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
       }
 
       const parser = this.parserFactory(paths.toolchainPath ?? '', this.debug);
-      const regions = parser.parse(paths.map, paths.elf);
+      const regions = await parser.parse(paths.map, paths.elf);
+      if (generation !== this.pathConfigurationGeneration) {
+        return;
+      }
 
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!root) {
