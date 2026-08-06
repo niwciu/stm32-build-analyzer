@@ -10,8 +10,7 @@ src/**
 webpack.config.js
 vsc-extension-quickstart.md
 openvsx_cmd.txt
-post-issue-10-review-findings.md
-post-issue-10-summary.md
+post-issue-10-*.md
 **/tsconfig.json
 **/eslint.config.mjs
 **/*.map
