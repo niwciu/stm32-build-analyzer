@@ -66,6 +66,68 @@ suite('resolveVariables', () => {
     });
   });
 
+  suite('${workspaceFolder:Name}', () => {
+    const workspaceFolders = [
+      { name: 'Application', path: '/work/product-a-application' },
+      { name: 'Toolchain', path: '/work/toolchain' },
+    ];
+
+    test('expands a named folder in a multi-root workspace', () => {
+      assert.strictEqual(
+        resolveVariables(
+          '${workspaceFolder:Toolchain}/arm-gnu-toolchain/bin',
+          workspaceFolders[0].path,
+          workspaceFolders
+        ),
+        '/work/toolchain/arm-gnu-toolchain/bin'
+      );
+    });
+
+    test('expands named and unnamed workspace folders independently', () => {
+      assert.strictEqual(
+        resolveVariables(
+          '${workspaceFolder}/build:${workspaceFolder:Toolchain}/bin',
+          workspaceFolders[0].path,
+          workspaceFolders
+        ),
+        '/work/product-a-application/build:/work/toolchain/bin'
+      );
+    });
+
+    test('expands multiple named folders', () => {
+      assert.strictEqual(
+        resolveVariables(
+          '${workspaceFolder:Application}:${workspaceFolder:Toolchain}',
+          workspaceFolders[0].path,
+          workspaceFolders
+        ),
+        '/work/product-a-application:/work/toolchain'
+      );
+    });
+
+    test('leaves an unknown named folder unchanged for a clear diagnostic', () => {
+      assert.strictEqual(
+        resolveVariables(
+          '${workspaceFolder:Missing}/bin',
+          workspaceFolders[0].path,
+          workspaceFolders
+        ),
+        '${workspaceFolder:Missing}/bin'
+      );
+    });
+
+    test('matches workspace folder names exactly', () => {
+      assert.strictEqual(
+        resolveVariables(
+          '${workspaceFolder:toolchain}/bin',
+          workspaceFolders[0].path,
+          workspaceFolders
+        ),
+        '${workspaceFolder:toolchain}/bin'
+      );
+    });
+  });
+
   suite('backward compatibility', () => {
     test('plain absolute path is returned unchanged', () => {
       const input = '/usr/local/arm-none-eabi/bin';

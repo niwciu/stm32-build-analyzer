@@ -111,9 +111,9 @@ Changes to path settings take effect automatically without reloading the VS Code
 
 | Setting | Type | Default | Description |
 | --- | --- | --- | --- |
-| `stm32BuildAnalyzerEnhanced.mapFilePath` | string | `""` | Absolute or workspace-relative path to the `.map` file. Supports `${userHome}`, `${workspaceFolder}`, and `${env:VAR}`. |
-| `stm32BuildAnalyzerEnhanced.elfFilePath` | string | `""` | Absolute or workspace-relative path to the `.elf` file. Supports `${userHome}`, `${workspaceFolder}`, and `${env:VAR}`. |
-| `stm32BuildAnalyzerEnhanced.toolchainPath` | string | `""` | Absolute or workspace-relative path to the ARM GNU Embedded toolchain binaries. Supports `${userHome}`, `${workspaceFolder}`, and `${env:VAR}`. |
+| `stm32BuildAnalyzerEnhanced.mapFilePath` | string | `""` | Absolute or workspace-relative path to the `.map` file. Supports `${userHome}`, `${workspaceFolder}`, `${workspaceFolder:Name}`, and `${env:VAR}`. |
+| `stm32BuildAnalyzerEnhanced.elfFilePath` | string | `""` | Absolute or workspace-relative path to the `.elf` file. Supports `${userHome}`, `${workspaceFolder}`, `${workspaceFolder:Name}`, and `${env:VAR}`. |
+| `stm32BuildAnalyzerEnhanced.toolchainPath` | string | `""` | Absolute or workspace-relative path to the ARM GNU Embedded toolchain binaries. Supports `${userHome}`, `${workspaceFolder}`, `${workspaceFolder:Name}`, and `${env:VAR}`. |
 | `stm32BuildAnalyzerEnhanced.manualBuildPairs` | array | `[]` | List of manual map/elf pairs for builds with non-matching names or locations. |
 | `stm32BuildAnalyzerEnhanced.debug` | boolean | `false` | Enable verbose logging for debugging purposes. |
 

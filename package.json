@@ -47,17 +47,17 @@
         "stm32BuildAnalyzerEnhanced.mapFilePath": {
           "type": "string",
           "default": "",
-          "description": "Path to the .map file (overrides automatic search). Supports absolute paths, workspace-relative paths, and variables: ${userHome}, ${workspaceFolder}, ${env:VAR}."
+          "description": "Path to the .map file (overrides automatic search). Supports absolute paths, workspace-relative paths, and variables: ${userHome}, ${workspaceFolder}, ${workspaceFolder:Name}, ${env:VAR}."
         },
         "stm32BuildAnalyzerEnhanced.elfFilePath": {
           "type": "string",
           "default": "",
-          "description": "Path to the .elf file (overrides automatic search). Supports absolute paths, workspace-relative paths, and variables: ${userHome}, ${workspaceFolder}, ${env:VAR}."
+          "description": "Path to the .elf file (overrides automatic search). Supports absolute paths, workspace-relative paths, and variables: ${userHome}, ${workspaceFolder}, ${workspaceFolder:Name}, ${env:VAR}."
         },
         "stm32BuildAnalyzerEnhanced.toolchainPath": {
           "type": "string",
           "default": "",
-          "description": "Path to the ARM GNU Embedded toolchain binaries directory (containing arm-none-eabi-objdump, arm-none-eabi-nm, etc.). Supports absolute paths, workspace-relative paths, and variables: ${userHome}, ${workspaceFolder}, ${env:VAR}. If not set, tools are resolved from PATH."
+          "description": "Path to the ARM GNU Embedded toolchain binaries directory (containing arm-none-eabi-objdump, arm-none-eabi-nm, etc.). Supports absolute paths, workspace-relative paths, and variables: ${userHome}, ${workspaceFolder}, ${workspaceFolder:Name}, ${env:VAR}. If not set, tools are resolved from PATH."
         },
         "stm32BuildAnalyzerEnhanced.debug": {
           "type": "boolean",

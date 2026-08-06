@@ -316,8 +316,16 @@ export class BuildFolderResolver {
   }
 
   private resolveVariables(value: string): string {
-    const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    return applyVariables(value, wsRoot);
+    const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
+    const wsRoot = workspaceFolders[0]?.uri.fsPath;
+    return applyVariables(
+      value,
+      wsRoot,
+      workspaceFolders.map(folder => ({
+        name: folder.name,
+        path: folder.uri.fsPath,
+      }))
+    );
   }
 
   private resolveCustomPath(value: string, root?: string): string | undefined {
