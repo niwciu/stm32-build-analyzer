@@ -133,6 +133,48 @@ suite('MapElfParser', () => {
         try { fs.unlinkSync(extraFile); } catch { /* ignore */ }
       }
     });
+
+    test('rejects an empty MAP file with its path', () => {
+      fs.writeFileSync(tempFile, ' \n', 'utf8');
+
+      assert.throws(
+        () => parseMap(parser, tempFile),
+        error => {
+          assert.ok(error instanceof Error);
+          assert.match(error.message, /MAP file is empty/);
+          assert.ok(error.message.includes(tempFile));
+          return true;
+        }
+      );
+    });
+
+    test('rejects a MAP file without a supported memory configuration', () => {
+      fs.writeFileSync(tempFile, 'Linker script and memory map\n.text 0x08000000', 'utf8');
+
+      assert.throws(
+        () => parseMap(parser, tempFile),
+        error => {
+          assert.ok(error instanceof Error);
+          assert.match(error.message, /does not contain a supported GNU linker Memory Configuration/);
+          assert.ok(error.message.includes(tempFile));
+          return true;
+        }
+      );
+    });
+
+    test('reports unreadable or missing MAP files clearly', () => {
+      const missing = `${tempFile}.missing`;
+
+      assert.throws(
+        () => parseMap(parser, missing),
+        error => {
+          assert.ok(error instanceof Error);
+          assert.match(error.message, /cannot read MAP file/);
+          assert.ok(error.message.includes(missing));
+          return true;
+        }
+      );
+    });
   });
 
   // Regression guard for issue #11: the parser must analyze a throwaway copy

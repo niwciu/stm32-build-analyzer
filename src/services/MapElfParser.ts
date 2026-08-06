@@ -110,7 +110,21 @@ export class MapElfParser {
   }
 
   private parseMap(mapFile: string): Region[] {
-    const lines = fs.readFileSync(mapFile, 'utf8').split('\n');
+    let content: string;
+    try {
+      content = fs.readFileSync(mapFile, 'utf8');
+    } catch (err: any) {
+      throw new Error(
+        `STM32 Build Analyzer: cannot read MAP file "${mapFile}": `
+        + `${err?.message ?? String(err)}`
+      );
+    }
+
+    if (content.trim().length === 0) {
+      throw new Error(`STM32 Build Analyzer: MAP file is empty: "${mapFile}".`);
+    }
+
+    const lines = content.split('\n');
     const regs: Region[] = [];
     const regionRx = /^\s*(\S+)\s+(0x[\da-fA-F]+)\s+(0x[\da-fA-F]+)/;
     let inMem = false;
@@ -137,6 +151,13 @@ export class MapElfParser {
           sections: []
         });
       }
+    }
+
+    if (regs.length === 0) {
+      throw new Error(
+        `STM32 Build Analyzer: MAP file "${mapFile}" does not contain a supported `
+        + 'GNU linker Memory Configuration with at least one usable memory region.'
+      );
     }
 
     return regs;
