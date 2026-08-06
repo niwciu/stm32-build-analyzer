@@ -1,5 +1,6 @@
 // Build Analyzer Webview Script
 // This script runs inside the VS Code webview
+import { findByKey } from '../src/utils/keyLookup';
 
 declare function acquireVsCodeApi(): {
     postMessage(message: unknown): void;
@@ -714,7 +715,8 @@ function setRowSelection(row: HTMLTableRowElement | null): void {
 }
 
 function syncRowSelection(): void {
-    if (!selectedRowKey) {
+    const key = selectedRowKey;
+    if (!key) {
         return;
     }
     (Object.keys(viewConfigs) as ViewMode[]).forEach(view => {
@@ -722,7 +724,11 @@ function syncRowSelection(): void {
         if (!table) {
             return;
         }
-        const row = table.querySelector<HTMLTableRowElement>(`tr[data-key="${selectedRowKey}"]`);
+        const row = findByKey(
+            table.querySelectorAll<HTMLTableRowElement>('tr[data-key]'),
+            key,
+            candidate => candidate.dataset.key
+        );
         if (row) {
             row.classList.add('row-selected');
         }
