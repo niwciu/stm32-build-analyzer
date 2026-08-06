@@ -98,7 +98,7 @@ The extension auto-detects `.map` + `.elf` files in common build folders. If you
 ### How auto-detection works
 
 1. If **both** `mapFilePath` and `elfFilePath` are set and point to readable files, the extension uses them directly and skips scanning.
-2. Otherwise, it scans the workspace for `.map` and `.elf` files with the same basename and treats each matching pair as a build output.
+2. Otherwise, it asynchronously scans the workspace for `.map` and `.elf` files with the same basename and treats each matching pair as a build output. Directory symlinks and common dependency/tooling folders are skipped.
 3. If multiple pairs are found, you will be prompted to pick the build output (or a manual pair). Configure a manual pair when the MAP and ELF names differ.
 
 ### Toolchain path behavior

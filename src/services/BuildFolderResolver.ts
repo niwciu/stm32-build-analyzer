@@ -2,7 +2,10 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { resolveVariables as applyVariables } from '../utils/pathVariables';
-import { pairBuildOutputNames } from '../utils/buildPairs';
+import {
+  discoverBuildPairs,
+  DiscoveredBuildPair,
+} from '../utils/buildDiscovery';
 
 export interface BuildPaths {
   map: string;
@@ -181,72 +184,13 @@ export class BuildFolderResolver {
   }
 
   private async findBuildPairs(root: string): Promise<ResolvedBuildPair[]> {
-    const found: ResolvedBuildPair[] = [];
-    const ignored = new Set(['node_modules', '.git', '.vscode', 'dist']);
-    const visited = new Set<string>();
-
-    const walk = (dir: string) => {
-      try {
-        const realPath = fs.realpathSync(dir);
-        if (visited.has(realPath)) {
-          return;
-        }
-        visited.add(realPath);
-
-        const entries = fs.readdirSync(dir, { withFileTypes: true });
-        for (const d of entries) {
-          const full = path.join(dir, d.name);
-          if (d.isDirectory()) {
-            if (!ignored.has(d.name)) {
-              walk(full);
-            }
-          } else if (d.isSymbolicLink()) {
-            try {
-              const stats = fs.statSync(full);
-              if (stats.isDirectory() && !ignored.has(d.name)) {
-                walk(full);
-              }
-            } catch (err) {
-              if (this.debug) {console.warn(`[STM32] Failed to stat symlink: ${full}`);}
-            }
-          }
-        }
-
-        const files = entries.filter(entry => entry.isFile()).map(entry => entry.name);
-        for (const pair of pairBuildOutputNames(files)) {
-          const mapFile = path.join(dir, pair.map);
-          const elfFile = path.join(dir, pair.elf);
-          try {
-            fs.accessSync(mapFile, fs.constants.R_OK);
-            fs.accessSync(elfFile, fs.constants.R_OK);
-            if (fs.statSync(mapFile).size === 0) {
-              continue;
-            }
-            found.push({
-              folder: dir,
-              map: mapFile,
-              elf: elfFile,
-              label: pair.stem,
-            });
-            if (this.debug) {
-              console.log(`[STM32] Found build pair: ${mapFile} + ${elfFile}`);
-            }
-          } catch {
-            if (this.debug) {
-              console.warn(`[STM32] Build pair is not readable: ${mapFile} + ${elfFile}`);
-            }
-          }
-        }
-      } catch (err) {
-        if (this.debug) {console.warn(`[STM32] Failed to access folder: ${dir}`);}
-      }
-    };
-
-    walk(root);
-
-    return found.sort((a, b) =>
-      a.folder.localeCompare(b.folder) || a.label.localeCompare(b.label)
-    );
+    const found: DiscoveredBuildPair[] = await discoverBuildPairs(root);
+    if (this.debug) {
+      found.forEach(pair =>
+        console.log(`[STM32] Found build pair: ${pair.map} + ${pair.elf}`)
+      );
+    }
+    return found;
   }
 
   private async resolveManualPairs(root: string, pairs: ManualBuildPair[]): Promise<ResolvedBuildPair[]> {
