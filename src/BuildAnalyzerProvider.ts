@@ -25,7 +25,7 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
     private readonly parserFactory: MapElfParserFactory =
       (toolchainPath, debug) => new MapElfParser(toolchainPath, debug)
   ) {
-    this.watcher  = new FileWatcherService(context, () => this.refresh());
+    this.watcher  = new FileWatcherService(() => this.refresh());
     this.resolver = new BuildFolderResolver(context);
     this.configurationDisposable = vscode.workspace.onDidChangeConfiguration(event => {
       if (!this.affectsBuildConfiguration(event)) {
@@ -91,6 +91,7 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         return;
       }
       this.paths = paths;
+      this.watcher.watchFiles([paths.map, paths.elf]);
 
       if (!paths.map || !paths.elf) {
         throw new Error('Missing required build paths.');
@@ -161,6 +162,7 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
     this.paths = undefined;
     this.lastMissingToolWarning = undefined;
     this.lastRefreshError = undefined;
+    this.watcher.watchFiles([]);
   }
 
   private async warnAboutMissingToolchainBinaries(toolchainPath?: string): Promise<void> {
