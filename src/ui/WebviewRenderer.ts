@@ -55,7 +55,11 @@ export class WebviewRenderer {
     });
   }
 
-  public showData(regions: Region[], buildFolder: string) {
+  public showData(
+    regions: Region[],
+    buildFolder: string,
+    warnings: readonly string[] = []
+  ): void {
     if (this.debug) {
       console.log(`[STM32 Webview] Sending ${regions.length} region(s) to webview.`);
     }
@@ -63,7 +67,8 @@ export class WebviewRenderer {
     this.view.webview.postMessage({
       command: 'showMapData',
       data: regions,
-      currentBuildFolderRelativePath: buildFolder
+      currentBuildFolderRelativePath: buildFolder,
+      warnings,
     });
   }
 

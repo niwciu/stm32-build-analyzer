@@ -459,5 +459,52 @@ suite('MapElfParser', () => {
         ['.bss', '.noinit']
       );
     });
+
+    test('preserves memory usage and warns when nm fails', () => {
+      const tempMap = path.join(os.tmpdir(), `stm32-partial-${Date.now()}.map`);
+      const tempElf = path.join(os.tmpdir(), `stm32-partial-${Date.now()}.elf`);
+      fs.writeFileSync(tempMap, SAMPLE_MAP, 'utf8');
+      fs.writeFileSync(tempElf, 'fake elf', 'utf8');
+      let call = 0;
+      const parserWithFailingNm = new MapElfParser('', false, () => {
+        call++;
+        if (call === 1) {
+          return {
+            pid: 1,
+            output: [],
+            stdout: Buffer.from([
+              'Sections:',
+              'Idx Name          Size      VMA       LMA       File off  Algn',
+              '  0 .text         00000020  08000000  08000000  00000100  2**2',
+              '                  CONTENTS, ALLOC, LOAD, READONLY, CODE',
+            ].join('\n')),
+            stderr: Buffer.alloc(0),
+            status: 0,
+            signal: null,
+          } as any;
+        }
+        return {
+          pid: 1,
+          output: [],
+          stdout: Buffer.alloc(0),
+          stderr: Buffer.from('symbol table unavailable'),
+          status: 1,
+          signal: null,
+        } as any;
+      });
+
+      try {
+        const regions = parserWithFailingNm.parse(tempMap, tempElf);
+        const flash = regions.find(region => region.name === 'FLASH');
+
+        assert.strictEqual(flash?.used, 0x20);
+        assert.strictEqual(parserWithFailingNm.warnings.length, 1);
+        assert.match(parserWithFailingNm.warnings[0], /failed to run arm-none-eabi-nm/);
+        assert.match(parserWithFailingNm.warnings[0], /symbol and source details are incomplete/);
+      } finally {
+        fs.rmSync(tempMap, { force: true });
+        fs.rmSync(tempElf, { force: true });
+      }
+    });
   });
 });

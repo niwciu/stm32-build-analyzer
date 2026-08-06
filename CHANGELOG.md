@@ -8,6 +8,7 @@
 - Count every initialized RAM section with a distinct ELF load image in both its runtime region and its Flash load region, rather than special-casing only `.data`.
 - Clear stale analysis results after a failed refresh and show the failure persistently inside the webview.
 - Reject empty, unreadable, or unsupported MAP files with an actionable error that identifies the selected file.
+- Preserve valid memory-region usage when `nm` fails and label symbol/source data as incomplete inside the webview; `objdump` remains required.
 - Apply changes to toolchain, map, ELF, and manual-pair settings without requiring a VS Code window reload.
 - Reset tool discovery to `PATH` when `toolchainPath` is cleared.
 - Show actionable errors when `objdump` or `nm` cannot run or exits unsuccessfully instead of silently rendering `0 B` memory usage.

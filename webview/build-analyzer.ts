@@ -938,13 +938,14 @@ function renderTables(regions: Region[]): void {
     syncSelectionCheckboxes();
 }
 
-function showAnalysisStatus(message?: string): void {
+function showAnalysisStatus(message?: string, level: 'error' | 'warning' = 'error'): void {
     const status = document.getElementById('analysisStatus');
     if (!status) {
         return;
     }
     status.textContent = message ?? '';
     status.classList.toggle('is-hidden', !message);
+    status.classList.toggle('is-warning', Boolean(message) && level === 'warning');
 }
 
 // Initialize when DOM is ready
@@ -1090,7 +1091,12 @@ window.addEventListener('message', (event: MessageEvent) => {
     switch (message.command) {
         case 'showMapData':
             lastRegions = message.data || [];
-            showAnalysisStatus();
+            showAnalysisStatus(
+                Array.isArray(message.warnings) && message.warnings.length > 0
+                    ? message.warnings.join('\n')
+                    : undefined,
+                'warning'
+            );
             selectedKeys.clear();
             showSelectedOnly = false;
             renderTables(lastRegions);

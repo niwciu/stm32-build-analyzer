@@ -23,6 +23,8 @@ export type ToolRunner = (
 ) => cp.SpawnSyncReturns<Buffer>;
 
 export class MapElfParser {
+  private analysisWarnings: string[] = [];
+
   constructor(
     private readonly toolchainPath: string,
     private readonly debug: boolean = false,
@@ -30,7 +32,13 @@ export class MapElfParser {
       (command, args, options) => cp.spawnSync(command, args, options)
   ) {}
 
+  public get warnings(): readonly string[] {
+    return this.analysisWarnings;
+  }
+
   public parse(mapPath: string, elfPath: string): Region[] {
+    this.analysisWarnings = [];
+
     if (this.debug) {
       console.log(`[STM32 Parser] Parsing map: ${mapPath}`);
       console.log(`[STM32 Parser] Parsing elf: ${elfPath}`);
@@ -53,7 +61,17 @@ export class MapElfParser {
     // original so analysis still works (e.g. POSIX, where this is harmless).
     this.withElfCopy(elfPath, safeElf => {
       this.parseSections(safeElf, regions);
-      this.parseSymbols(safeElf, regions);
+      try {
+        this.parseSymbols(safeElf, regions);
+      } catch (err) {
+        if (err instanceof ToolExecutionError && err.tool === 'arm-none-eabi-nm') {
+          this.analysisWarnings.push(
+            `${err.message} Memory usage is available, but symbol and source details are incomplete.`
+          );
+          return;
+        }
+        throw err;
+      }
     });
 
     return regions;

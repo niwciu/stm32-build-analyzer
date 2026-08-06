@@ -111,7 +111,7 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
       const rel = path.relative(root, paths.map);
 
-      this.renderer?.showData(regions, path.dirname(rel));
+      this.renderer?.showData(regions, path.dirname(rel), parser.warnings);
       this.lastRefreshError = undefined;
 
       if (this.debug) {
