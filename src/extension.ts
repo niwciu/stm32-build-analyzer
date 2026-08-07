@@ -1,14 +1,12 @@
 import * as vscode from 'vscode';
 import { BuildAnalyzerProvider } from './BuildAnalyzerProvider';
+import {
+  getManualBuildPairsForTarget,
+  ManualBuildPair,
+  validateRequiredPath,
+} from './utils/manualBuildPairs';
 
 let provider: BuildAnalyzerProvider;
-
-interface ManualBuildPair {
-  label?: string;
-  folder: string;
-  map: string;
-  elf: string;
-}
 
 export function activate(context: vscode.ExtensionContext) {
   if (isDebugEnabled()) {
@@ -62,18 +60,21 @@ async function addManualPair() {
   const folder = await vscode.window.showInputBox({
     prompt: 'Build folder path (absolute or workspace-relative)',
     placeHolder: 'build/Release',
+    validateInput: validateRequiredPath,
   });
   if (!folder) {return;}
 
   const map = await vscode.window.showInputBox({
     prompt: 'Map file path (absolute or relative to the build folder)',
     placeHolder: 'firmware.map',
+    validateInput: validateRequiredPath,
   });
   if (!map) {return;}
 
   const elf = await vscode.window.showInputBox({
     prompt: 'ELF file path (absolute or relative to the build folder)',
     placeHolder: 'firmware.out',
+    validateInput: validateRequiredPath,
   });
   if (!elf) {return;}
 
@@ -87,7 +88,11 @@ async function addManualPair() {
   if (!scopePick) {return;}
 
   const cfg = vscode.workspace.getConfiguration('stm32BuildAnalyzerEnhanced');
-  const current = cfg.get<ManualBuildPair[]>('manualBuildPairs') ?? [];
+  const inspected = cfg.inspect<ManualBuildPair[]>('manualBuildPairs');
+  const target = scopePick.target === vscode.ConfigurationTarget.Global
+    ? 'user'
+    : 'workspace';
+  const current = getManualBuildPairsForTarget(inspected, target);
   const next: ManualBuildPair[] = [
     ...current,
     {
@@ -99,7 +104,13 @@ async function addManualPair() {
   ];
 
   await cfg.update('manualBuildPairs', next, scopePick.target);
-  vscode.window.showInformationMessage('STM32 Build Analyzer: manual pair added.');
+  const workspaceOverrideNote = target === 'user' && inspected?.workspaceValue !== undefined
+    ? ' This workspace has its own manualBuildPairs setting, so the User pair is stored '
+      + 'but is not active in this workspace.'
+    : '';
+  vscode.window.showInformationMessage(
+    `STM32 Build Analyzer: manual pair added.${workspaceOverrideNote}`
+  );
 
   if (isDebugEnabled()) {
     console.log('[STM32 Extension] Manual pair added:', next[next.length - 1]);
