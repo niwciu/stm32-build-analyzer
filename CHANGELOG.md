@@ -32,6 +32,9 @@
 - Preserve the active symbol sort order and indicator when switching between Classic and Table views.
 - Apply `toolchainPath` changes without rescanning or reopening selection for an already selected MAP/ELF pair.
 - Refresh multi-root workspace state when folders change while silently retaining a still-valid build selection.
+- Suppress toolchain warnings produced by a refresh that has already been superseded.
+- Preserve the selected configuration scope when adding manual build pairs and reject whitespace-only paths.
+- Clear stale symbol-search status text when an analysis failure replaces the current result.
 - Apply changes to toolchain, map, ELF, and manual-pair settings without requiring a VS Code window reload.
 - Reset tool discovery to `PATH` when `toolchainPath` is cleared.
 - Show actionable errors when `objdump` or `nm` cannot run or exits unsuccessfully instead of silently rendering `0 B` memory usage.
@@ -44,6 +47,7 @@
 - Added regression coverage for resolved toolchain wiring, tool fallback, execution failures, and required binary validation.
 - Corrected VSIX contents so compiled entry points and view icons are included while development-only files and dependencies are excluded.
 - Added Windows extension-host CI coverage and negative checks for development files in packaged VSIX artifacts.
+- Added a disposable multi-root integration fixture that verifies named workspace variables and configuration/workspace refresh events through the real resolver.
 
 ## [1.1.6] – 2026-06-06
 
