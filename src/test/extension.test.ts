@@ -159,7 +159,10 @@ suite('Extension', () => {
 
     try {
       await provider.refresh();
-      assert.strictEqual(toolchainPaths[0], toolchainDirectory);
+      assert.strictEqual(
+        path.normalize(toolchainPaths[0]),
+        path.normalize(toolchainDirectory)
+      );
 
       await cfg.update(
         'toolchainPath',
