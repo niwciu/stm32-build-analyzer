@@ -28,6 +28,10 @@
 - Cancel superseded filesystem discovery and native tool processes when a newer refresh starts.
 - Enable unused-code, implicit-return, and switch-fallthrough TypeScript checks.
 - Treat explicit MAP/ELF and manual-pair settings as authoritative and report partial or inaccessible configurations instead of silently falling back to discovery.
+- Restore automatic discovery for firmware projects that use an output directory named `out`.
+- Preserve the active symbol sort order and indicator when switching between Classic and Table views.
+- Apply `toolchainPath` changes without rescanning or reopening selection for an already selected MAP/ELF pair.
+- Refresh multi-root workspace state when folders change while silently retaining a still-valid build selection.
 - Apply changes to toolchain, map, ELF, and manual-pair settings without requiring a VS Code window reload.
 - Reset tool discovery to `PATH` when `toolchainPath` is cleared.
 - Show actionable errors when `objdump` or `nm` cannot run or exits unsuccessfully instead of silently rendering `0 B` memory usage.
@@ -39,6 +43,7 @@
 - Debug logging configuration now takes effect without reloading the extension.
 - Added regression coverage for resolved toolchain wiring, tool fallback, execution failures, and required binary validation.
 - Corrected VSIX contents so compiled entry points and view icons are included while development-only files and dependencies are excluded.
+- Added Windows extension-host CI coverage and negative checks for development files in packaged VSIX artifacts.
 
 ## [1.1.6] – 2026-06-06
 

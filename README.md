@@ -97,14 +97,14 @@ The extension auto-detects `.map` + `.elf` files in common build folders. If you
 
 ### How auto-detection works
 
-1. If **both** `mapFilePath` and `elfFilePath` are set and point to readable files, the extension uses them directly and skips scanning.
-2. Otherwise, it asynchronously scans every root in a multi-root workspace for `.map` and `.elf` files with the same basename and treats each matching pair as a build output. Directory symlinks and common dependency/tooling folders are skipped.
+1. If either `mapFilePath` or `elfFilePath` is configured, both settings must point to readable files. A valid explicit pair is used directly and skips scanning; an incomplete or inaccessible pair produces a clear configuration error.
+2. When neither explicit path is configured, the extension asynchronously scans every root in a multi-root workspace for `.map` and `.elf` files with the same basename and treats each matching pair as a build output. Directory symlinks and common dependency/tooling folders are skipped.
 3. If multiple pairs are found, you will be prompted to pick the build output (or a manual pair). Configure a manual pair when the MAP and ELF names differ.
 
 ### Toolchain path behavior
 
 When `toolchainPath` is set, the extension resolves variables and workspace-relative paths, then uses the `arm-none-eabi-objdump` and `arm-none-eabi-nm` binaries from that directory.
-If it is **not** set (or an individual binary is not found), the extension falls back to that tool from your system `PATH` and reports the fallback. Tool execution failures are shown as errors instead of displaying misleading `0 B` usage.
+If it is **not** set, tools are resolved from your system `PATH`. If a configured directory is missing an individual binary, the extension reports it and falls back to that tool from `PATH`. Tool execution failures are shown as errors instead of displaying misleading `0 B` usage.
 Changes to path settings take effect automatically without reloading the VS Code window.
 Unset environment variables and unknown named workspace folders are reported explicitly instead of being replaced with an empty string.
 `mapFilePath` and `elfFilePath` must be configured together; invalid explicit or manual paths are reported instead of being silently replaced by automatic discovery.
