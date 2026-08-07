@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import {
+  createAnalysisFailureUiState,
   createSingleViewRenderPlan,
   getStoredSortDirective,
 } from '../utils/viewRendering';
@@ -36,6 +37,25 @@ suite('single-view rendering', () => {
     assert.strictEqual(
       getStoredSortDirective({ field: null, isAscending: true }),
       undefined
+    );
+  });
+
+  test('clears transient labels when analysis fails', () => {
+    assert.deepStrictEqual(
+      createAnalysisFailureUiState('objdump failed'),
+      {
+        status: 'objdump failed',
+        buildFolder: 'Analysis unavailable',
+        selectionToggle: 'Show Selected',
+        searchMatchCount: '',
+      }
+    );
+  });
+
+  test('uses the default analysis failure message', () => {
+    assert.strictEqual(
+      createAnalysisFailureUiState().status,
+      'Build analysis failed.'
     );
   });
 });

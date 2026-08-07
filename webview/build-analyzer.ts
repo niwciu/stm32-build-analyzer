@@ -7,6 +7,7 @@ import {
 } from '../src/utils/usage';
 import { createTextMatcher } from '../src/utils/textSearch';
 import {
+    createAnalysisFailureUiState,
     createSingleViewRenderPlan,
     getStoredSortDirective,
 } from '../src/utils/viewRendering';
@@ -1120,20 +1121,25 @@ window.addEventListener('message', (event: MessageEvent) => {
             }
             break;
         case 'showAnalysisError':
+            const failureState = createAnalysisFailureUiState(message.message);
             lastRegions = [];
             expandedKeys.clear();
             selectedKeys.clear();
             selectedRowKey = null;
             showSelectedOnly = false;
             renderTables([]);
-            showAnalysisStatus(message.message || 'Build analysis failed.');
+            showAnalysisStatus(failureState.status);
             const failedBuildFolder = document.getElementById('buildFolderPath');
             if (failedBuildFolder) {
-                failedBuildFolder.textContent = 'Analysis unavailable';
+                failedBuildFolder.textContent = failureState.buildFolder;
             }
             const selectionToggle = document.getElementById('toggleSelectionButton');
             if (selectionToggle) {
-                selectionToggle.textContent = 'Show Selected';
+                selectionToggle.textContent = failureState.selectionToggle;
+            }
+            const failedSearchMatchCount = document.getElementById('searchMatchCount');
+            if (failedSearchMatchCount) {
+                failedSearchMatchCount.textContent = failureState.searchMatchCount;
             }
             break;
         case 'restoreScroll':

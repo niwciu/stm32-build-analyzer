@@ -13,6 +13,13 @@ export interface SortDirective {
   isAscending: boolean;
 }
 
+export interface AnalysisFailureUiState {
+  status: string;
+  buildFolder: string;
+  selectionToggle: string;
+  searchMatchCount: string;
+}
+
 export function createSingleViewRenderPlan<T extends string>(
   views: readonly T[],
   activeView: T
@@ -29,4 +36,15 @@ export function getStoredSortDirective(
   return state.field
     ? { field: state.field, isAscending: state.isAscending }
     : undefined;
+}
+
+export function createAnalysisFailureUiState(
+  message?: string
+): AnalysisFailureUiState {
+  return {
+    status: message || 'Build analysis failed.',
+    buildFolder: 'Analysis unavailable',
+    selectionToggle: 'Show Selected',
+    searchMatchCount: '',
+  };
 }
