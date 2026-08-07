@@ -16,7 +16,6 @@ const DEFAULT_IGNORED_DIRECTORIES = new Set([
   '.vscode',
   '.vscode-test',
   'dist',
-  'out',
 ]);
 
 export async function discoverBuildPairs(

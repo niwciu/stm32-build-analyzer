@@ -41,6 +41,16 @@ suite('build output discovery', () => {
     }]);
   });
 
+  test('finds firmware outputs in a directory named out', async () => {
+    const output = path.join(root, 'project', 'out');
+    await writePair(output, 'firmware');
+
+    const pairs = await discoverBuildPairs(root);
+
+    assert.strictEqual(pairs.length, 1);
+    assert.strictEqual(pairs[0].folder, output);
+  });
+
   test('ignores unrelated MAP and ELF files', async () => {
     await fs.promises.writeFile(path.join(root, 'application.map'), 'map');
     await fs.promises.writeFile(path.join(root, 'bootloader.elf'), 'elf');
