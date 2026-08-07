@@ -3,6 +3,16 @@ export interface SingleViewRenderPlan<T extends string> {
   clear: T[];
 }
 
+export interface StoredSortState {
+  field: string | null;
+  isAscending: boolean;
+}
+
+export interface SortDirective {
+  field: string;
+  isAscending: boolean;
+}
+
 export function createSingleViewRenderPlan<T extends string>(
   views: readonly T[],
   activeView: T
@@ -11,4 +21,12 @@ export function createSingleViewRenderPlan<T extends string>(
     render: activeView,
     clear: views.filter(view => view !== activeView),
   };
+}
+
+export function getStoredSortDirective(
+  state: StoredSortState
+): SortDirective | undefined {
+  return state.field
+    ? { field: state.field, isAscending: state.isAscending }
+    : undefined;
 }

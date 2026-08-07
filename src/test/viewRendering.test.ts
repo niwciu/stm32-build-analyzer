@@ -1,5 +1,8 @@
 import * as assert from 'assert';
-import { createSingleViewRenderPlan } from '../utils/viewRendering';
+import {
+  createSingleViewRenderPlan,
+  getStoredSortDirective,
+} from '../utils/viewRendering';
 
 suite('single-view rendering', () => {
   test('renders only the active view and clears every hidden view', () => {
@@ -19,6 +22,20 @@ suite('single-view rendering', () => {
         render: 'table',
         clear: ['classic'],
       }
+    );
+  });
+
+  test('restores an active sort after the table is rendered again', () => {
+    assert.deepStrictEqual(
+      getStoredSortDirective({ field: 'size', isAscending: false }),
+      { field: 'size', isAscending: false }
+    );
+  });
+
+  test('does not request sorting when the original order is active', () => {
+    assert.strictEqual(
+      getStoredSortDirective({ field: null, isAscending: true }),
+      undefined
     );
   });
 });

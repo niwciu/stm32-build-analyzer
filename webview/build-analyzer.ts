@@ -6,7 +6,10 @@ import {
     clampProgressPercent,
 } from '../src/utils/usage';
 import { createTextMatcher } from '../src/utils/textSearch';
-import { createSingleViewRenderPlan } from '../src/utils/viewRendering';
+import {
+    createSingleViewRenderPlan,
+    getStoredSortDirective,
+} from '../src/utils/viewRendering';
 
 declare function acquireVsCodeApi(): {
     postMessage(message: unknown): void;
@@ -925,6 +928,10 @@ function renderTables(regions: Region[]): void {
     if (config.body) {
         resetTableRegions(config.body);
         fillTableRegions(regions, config.body, icons);
+        const sort = getStoredSortDirective(sortStates[plan.render]);
+        if (sort) {
+            applySorting(sort.field, sort.isAscending, config.body, plan.render);
+        }
         updateSortIndicators(plan.render, sortStates[plan.render]);
     }
     syncExpandedState();
