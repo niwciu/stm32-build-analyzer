@@ -35,11 +35,20 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
     this.watcher  = new FileWatcherService(() => this.refresh());
     this.resolver = new BuildFolderResolver();
     this.configurationDisposable = vscode.workspace.onDidChangeConfiguration(event => {
-      if (!this.affectsBuildConfiguration(event)) {
+      const buildPathsChanged = this.affectsBuildPathConfiguration(event);
+      const toolchainChanged = event.affectsConfiguration(
+        'stm32BuildAnalyzerEnhanced.toolchainPath'
+      );
+      if (!buildPathsChanged && !toolchainChanged) {
         return;
       }
 
-      this.invalidatePaths();
+      if (buildPathsChanged) {
+        this.invalidatePaths();
+      } else {
+        this.lastMissingToolWarning = undefined;
+        this.lastRefreshError = undefined;
+      }
       if (this.renderer) {
         void this.refresh();
       }
@@ -95,7 +104,14 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
       assertWorkspaceTrusted(vscode.workspace.isTrusted);
 
       const generation = this.pathConfigurationGeneration;
-      const paths = this.paths ?? await this.resolver.resolve(controller.signal);
+      const cachedPaths = this.paths;
+      const resolvedPaths = cachedPaths ?? await this.resolver.resolve(controller.signal);
+      const paths = cachedPaths
+        ? {
+          ...cachedPaths,
+          toolchainPath: await this.resolver.resolveToolchainPath(),
+        }
+        : resolvedPaths;
       if (controller.signal.aborted || refreshGeneration !== this.refreshGeneration) {
         return 'superseded';
       }
@@ -191,9 +207,8 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
     if (this.debug) {console.log('[STM32 Provider] Disposed.');}
   }
 
-  private affectsBuildConfiguration(event: vscode.ConfigurationChangeEvent): boolean {
+  private affectsBuildPathConfiguration(event: vscode.ConfigurationChangeEvent): boolean {
     return [
-      'toolchainPath',
       'mapFilePath',
       'elfFilePath',
       'manualBuildPairs',

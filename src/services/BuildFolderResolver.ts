@@ -95,7 +95,7 @@ export class BuildFolderResolver {
       return {
         map: resolvedCustomMap,
         elf: resolvedCustomElf,
-        toolchainPath: await this.getToolchainPath(),
+        toolchainPath: await this.resolveToolchainPath(),
       };
     }
 
@@ -162,11 +162,11 @@ export class BuildFolderResolver {
     return {
       map: selection.pair.map,
       elf: selection.pair.elf,
-      toolchainPath: await this.getToolchainPath(),
+      toolchainPath: await this.resolveToolchainPath(),
     };
   }
 
-  private async getToolchainPath(): Promise<string | undefined> {
+  public async resolveToolchainPath(): Promise<string | undefined> {
     const cfg = vscode.workspace.getConfiguration('stm32BuildAnalyzerEnhanced');
     const raw = cfg.get<string>('toolchainPath');
 

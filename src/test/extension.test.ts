@@ -28,10 +28,11 @@ suite('Extension', () => {
     }
   });
 
-  test('provider passes the resolved toolchain path to the parser and resets it when cleared', async () => {
+  test('provider refreshes the toolchain without resolving the build pair again', async () => {
     const subscriptions: vscode.Disposable[] = [];
     const context = { subscriptions } as unknown as vscode.ExtensionContext;
     const toolchainPaths: string[] = [];
+    let buildPathResolutions = 0;
     const parserFactory = (toolchainPath: string): MapElfParser => {
       toolchainPaths.push(toolchainPath);
       return { parse: () => [] } as unknown as MapElfParser;
@@ -41,11 +42,15 @@ suite('Extension', () => {
     let resolvedToolchainPath: string | undefined = `${root}/resolved-toolchain`;
 
     (provider as any).resolver = {
-      resolve: async () => ({
-        map: `${root}/build/firmware.map`,
-        elf: `${root}/build/firmware.elf`,
-        toolchainPath: resolvedToolchainPath,
-      }),
+      resolve: async () => {
+        buildPathResolutions++;
+        return {
+          map: `${root}/build/firmware.map`,
+          elf: `${root}/build/firmware.elf`,
+          toolchainPath: resolvedToolchainPath,
+        };
+      },
+      resolveToolchainPath: async () => resolvedToolchainPath,
     };
     (provider as any).renderer = {
       showData: () => undefined,
@@ -55,9 +60,10 @@ suite('Extension', () => {
     try {
       await provider.refresh();
       resolvedToolchainPath = undefined;
-      await provider.fullRefresh();
+      await provider.refresh();
 
       assert.deepStrictEqual(toolchainPaths, [`${root}/resolved-toolchain`, '']);
+      assert.strictEqual(buildPathResolutions, 1);
     } finally {
       provider.dispose();
       subscriptions.forEach(disposable => disposable.dispose());
@@ -84,6 +90,7 @@ suite('Extension', () => {
         map: `${root}/build/firmware.map`,
         elf: `${root}/build/firmware.elf`,
       }),
+      resolveToolchainPath: async () => undefined,
     };
     (provider as any).renderer = {
       showData: () => { shownData = true; },
@@ -170,6 +177,7 @@ suite('Extension', () => {
         map: `${root}/build/firmware.map`,
         elf: `${root}/build/firmware.elf`,
       }),
+      resolveToolchainPath: async () => undefined,
     };
     (provider as any).renderer = {
       showData: () => { shownData++; },
