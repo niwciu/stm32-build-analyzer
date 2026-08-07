@@ -11,6 +11,10 @@ import {
 } from '../utils/buildDiscovery';
 import { UserCancelledError } from '../utils/errors';
 import { assertCustomBuildPairComplete } from '../utils/customBuildPaths';
+import {
+  BuildOutputPaths,
+  findPreferredBuildOutput,
+} from '../utils/buildPairs';
 
 export interface BuildPaths {
   map: string;
@@ -46,7 +50,10 @@ export class BuildFolderResolver {
       .get<boolean>('debug') ?? false;
   }
 
-  public async resolve(signal?: AbortSignal): Promise<BuildPaths> {
+  public async resolve(
+    signal?: AbortSignal,
+    preferredPaths?: BuildOutputPaths
+  ): Promise<BuildPaths> {
     const cfg = vscode.workspace.getConfiguration('stm32BuildAnalyzerEnhanced');
     const customMap = cfg.get<string>('mapFilePath');
     const customElf = cfg.get<string>('elfFilePath');
@@ -129,8 +136,14 @@ export class BuildFolderResolver {
       );
     }
 
-    let selection = selections[0];
-    if (selections.length > 1) {
+    const preferredPair = findPreferredBuildOutput(
+      selections.map(candidate => candidate.pair),
+      preferredPaths
+    );
+    let selection = preferredPair
+      ? selections.find(candidate => candidate.pair === preferredPair)!
+      : selections[0];
+    if (selections.length > 1 && !preferredPair) {
       if (this.debug) {
         console.log(`[STM32] Multiple build targets found:`);
         selections.forEach(s => {

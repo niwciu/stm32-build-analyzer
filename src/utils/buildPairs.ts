@@ -1,7 +1,14 @@
+import * as path from 'path';
+
 export interface BuildOutputNamePair {
   map: string;
   elf: string;
   stem: string;
+}
+
+export interface BuildOutputPaths {
+  map: string;
+  elf: string;
 }
 
 function outputStem(fileName: string, extension: '.map' | '.elf'): string | undefined {
@@ -42,4 +49,28 @@ export function pairBuildOutputNames(fileNames: readonly string[]): BuildOutputN
       };
       return priority(a.stem) - priority(b.stem) || a.stem.localeCompare(b.stem);
     });
+}
+
+export function findPreferredBuildOutput<T extends BuildOutputPaths>(
+  candidates: readonly T[],
+  preferred?: BuildOutputPaths,
+  platform: NodeJS.Platform = process.platform
+): T | undefined {
+  if (!preferred) {
+    return undefined;
+  }
+
+  const normalize = (value: string): string => {
+    const normalized = platform === 'win32'
+      ? path.win32.normalize(value)
+      : path.normalize(value);
+    return platform === 'win32' ? normalized.toLowerCase() : normalized;
+  };
+  const preferredMap = normalize(preferred.map);
+  const preferredElf = normalize(preferred.elf);
+
+  return candidates.find(candidate =>
+    normalize(candidate.map) === preferredMap
+    && normalize(candidate.elf) === preferredElf
+  );
 }

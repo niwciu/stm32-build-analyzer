@@ -1,5 +1,8 @@
 import * as assert from 'assert';
-import { pairBuildOutputNames } from '../utils/buildPairs';
+import {
+  findPreferredBuildOutput,
+  pairBuildOutputNames,
+} from '../utils/buildPairs';
 
 suite('build output pairing', () => {
   test('pairs MAP and ELF files with the same basename', () => {
@@ -49,6 +52,50 @@ suite('build output pairing', () => {
         'app-release.elf',
       ]).map(pair => pair.stem),
       ['app-release', 'app-debug', 'zeta']
+    );
+  });
+
+  test('keeps a previously selected build output when it still exists', () => {
+    const candidates = [
+      { map: '/workspace/a.map', elf: '/workspace/a.elf', label: 'a' },
+      { map: '/workspace/b.map', elf: '/workspace/b.elf', label: 'b' },
+    ];
+
+    assert.strictEqual(
+      findPreferredBuildOutput(candidates, {
+        map: '/workspace/b.map',
+        elf: '/workspace/b.elf',
+      }),
+      candidates[1]
+    );
+  });
+
+  test('matches a previous Windows selection case-insensitively', () => {
+    const candidate = {
+      map: 'D:\\Build\\Firmware.MAP',
+      elf: 'D:\\Build\\Firmware.ELF',
+    };
+
+    assert.strictEqual(
+      findPreferredBuildOutput(
+        [candidate],
+        {
+          map: 'd:\\build\\firmware.map',
+          elf: 'd:\\build\\firmware.elf',
+        },
+        'win32'
+      ),
+      candidate
+    );
+  });
+
+  test('does not reuse a build output that is no longer available', () => {
+    assert.strictEqual(
+      findPreferredBuildOutput(
+        [{ map: '/workspace/a.map', elf: '/workspace/a.elf' }],
+        { map: '/workspace/missing.map', elf: '/workspace/missing.elf' }
+      ),
+      undefined
     );
   });
 });

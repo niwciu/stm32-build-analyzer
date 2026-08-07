@@ -24,8 +24,10 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
   private lastRefreshError?: string;
   private activeRefresh?: AbortController;
   private refreshGeneration = 0;
+  private preferredBuildPaths?: Pick<BuildPaths, 'map' | 'elf'>;
   private readonly configurationDisposable: vscode.Disposable;
   private readonly workspaceTrustDisposable: vscode.Disposable;
+  private readonly workspaceFoldersDisposable: vscode.Disposable;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -61,6 +63,14 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
       }
     });
     this.context.subscriptions.push(this.workspaceTrustDisposable);
+    this.workspaceFoldersDisposable = vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      const previousPaths = this.paths;
+      this.invalidatePaths(previousPaths);
+      if (this.renderer) {
+        void this.refresh();
+      }
+    });
+    this.context.subscriptions.push(this.workspaceFoldersDisposable);
 
     this.watcher.start();
 
@@ -105,7 +115,10 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
       const generation = this.pathConfigurationGeneration;
       const cachedPaths = this.paths;
-      const resolvedPaths = cachedPaths ?? await this.resolver.resolve(controller.signal);
+      const resolvedPaths = cachedPaths ?? await this.resolver.resolve(
+        controller.signal,
+        this.preferredBuildPaths
+      );
       const paths = cachedPaths
         ? {
           ...cachedPaths,
@@ -122,6 +135,7 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         return 'superseded';
       }
       this.paths = paths;
+      this.preferredBuildPaths = undefined;
       this.watcher.watchFiles([paths.map, paths.elf]);
 
       if (!paths.map || !paths.elf) {
@@ -203,6 +217,7 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
     this.activeRefresh?.abort();
     this.configurationDisposable.dispose();
     this.workspaceTrustDisposable.dispose();
+    this.workspaceFoldersDisposable.dispose();
     this.watcher.dispose();
     if (this.debug) {console.log('[STM32 Provider] Disposed.');}
   }
@@ -217,9 +232,12 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
     );
   }
 
-  private invalidatePaths(): void {
+  private invalidatePaths(preferredPaths?: Pick<BuildPaths, 'map' | 'elf'>): void {
     this.pathConfigurationGeneration++;
     this.paths = undefined;
+    this.preferredBuildPaths = preferredPaths
+      ? { map: preferredPaths.map, elf: preferredPaths.elf }
+      : undefined;
     this.lastMissingToolWarning = undefined;
     this.lastRefreshError = undefined;
     this.watcher.watchFiles([]);
