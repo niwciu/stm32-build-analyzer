@@ -12,6 +12,7 @@ import {
 } from './utils/errors';
 
 export type MapElfParserFactory = (toolchainPath: string, debug: boolean) => MapElfParser;
+export type MissingToolchainBinariesFinder = (toolchainPath: string) => Promise<string[]>;
 type RefreshOutcome = 'success' | 'cancelled' | 'superseded' | 'failed';
 
 export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
@@ -32,7 +33,9 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly parserFactory: MapElfParserFactory =
-      (toolchainPath, debug) => new MapElfParser(toolchainPath, debug)
+      (toolchainPath, debug) => new MapElfParser(toolchainPath, debug),
+    private readonly missingToolchainBinariesFinder: MissingToolchainBinariesFinder =
+      findMissingToolchainBinaries
   ) {
     this.watcher  = new FileWatcherService(() => this.refresh());
     this.resolver = new BuildFolderResolver();
@@ -142,8 +145,18 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         throw new Error('Missing required build paths.');
       }
 
-      await this.warnAboutMissingToolchainBinaries(paths.toolchainPath);
-      if (generation !== this.pathConfigurationGeneration) {
+      await this.warnAboutMissingToolchainBinaries(
+        paths.toolchainPath,
+        () =>
+          !controller.signal.aborted
+          && refreshGeneration === this.refreshGeneration
+          && generation === this.pathConfigurationGeneration
+      );
+      if (
+        controller.signal.aborted
+        || refreshGeneration !== this.refreshGeneration
+        || generation !== this.pathConfigurationGeneration
+      ) {
         return 'superseded';
       }
 
@@ -243,13 +256,19 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
     this.watcher.watchFiles([]);
   }
 
-  private async warnAboutMissingToolchainBinaries(toolchainPath?: string): Promise<void> {
+  private async warnAboutMissingToolchainBinaries(
+    toolchainPath: string | undefined,
+    isCurrent: () => boolean
+  ): Promise<void> {
     if (!toolchainPath) {
       this.lastMissingToolWarning = undefined;
       return;
     }
 
-    const missing = await findMissingToolchainBinaries(toolchainPath);
+    const missing = await this.missingToolchainBinariesFinder(toolchainPath);
+    if (!isCurrent()) {
+      return;
+    }
     if (missing.length === 0) {
       this.lastMissingToolWarning = undefined;
       return;

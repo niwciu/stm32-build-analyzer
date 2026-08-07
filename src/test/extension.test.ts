@@ -326,4 +326,56 @@ suite('Extension', () => {
       subscriptions.forEach(disposable => disposable.dispose());
     }
   });
+
+  test('a superseded refresh cannot publish an outdated toolchain warning', async () => {
+    const subscriptions: vscode.Disposable[] = [];
+    const context = { subscriptions } as unknown as vscode.ExtensionContext;
+    let completeMissingBinaryCheck: ((missing: string[]) => void) | undefined;
+    let markMissingBinaryCheckStarted: (() => void) | undefined;
+    const missingBinaryCheckStarted = new Promise<void>(resolve => {
+      markMissingBinaryCheckStarted = resolve;
+    });
+    const provider = new BuildAnalyzerProvider(
+      context,
+      () => ({
+        warnings: [],
+        parse: async () => [],
+      } as unknown as MapElfParser),
+      async () => {
+        markMissingBinaryCheckStarted?.();
+        return new Promise<string[]>(resolve => {
+          completeMissingBinaryCheck = resolve;
+        });
+      }
+    );
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+
+    (provider as any).resolver = {
+      resolve: async () => ({
+        map: `${root}/build/firmware.map`,
+        elf: `${root}/build/firmware.elf`,
+        toolchainPath: `${root}/old-toolchain`,
+      }),
+      resolveToolchainPath: async () => undefined,
+    };
+    (provider as any).renderer = {
+      showData: () => undefined,
+      showError: () => undefined,
+    };
+
+    try {
+      const first = provider.refresh();
+      await missingBinaryCheckStarted;
+      const second = provider.refresh();
+      completeMissingBinaryCheck?.(['arm-none-eabi-objdump']);
+
+      const outcomes = await Promise.all([first, second]);
+
+      assert.deepStrictEqual(outcomes, ['superseded', 'success']);
+      assert.strictEqual((provider as any).lastMissingToolWarning, undefined);
+    } finally {
+      provider.dispose();
+      subscriptions.forEach(disposable => disposable.dispose());
+    }
+  });
 });
