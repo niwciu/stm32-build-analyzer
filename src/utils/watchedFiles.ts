@@ -4,7 +4,8 @@ export function normalizeWatchedFile(
   filePath: string,
   platform: NodeJS.Platform = process.platform
 ): string {
-  const normalized = path.normalize(filePath);
+  const pathApi = platform === 'win32' ? path.win32 : path.posix;
+  const normalized = pathApi.normalize(filePath);
   return platform === 'win32' ? normalized.toLowerCase() : normalized;
 }
 
