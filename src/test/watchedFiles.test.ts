@@ -26,4 +26,18 @@ suite('watched build files', () => {
     ]);
     assert.ok(isSelectedBuildFile('d:\\build\\firmware.elf', selected, 'win32'));
   });
+
+  test('uses POSIX normalization independently of the host platform', () => {
+    assert.strictEqual(
+      normalizeWatchedFile('/workspace/output/../build/firmware.elf', 'linux'),
+      '/workspace/build/firmware.elf'
+    );
+  });
+
+  test('uses Windows normalization independently of the host platform', () => {
+    assert.strictEqual(
+      normalizeWatchedFile('D:\\Build\\output\\..\\Firmware.ELF', 'win32'),
+      'd:\\build\\firmware.elf'
+    );
+  });
 });
