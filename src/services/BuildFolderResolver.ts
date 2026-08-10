@@ -1,7 +1,20 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { resolveVariables as applyVariables } from '../utils/pathVariables';
+import {
+  findUnresolvedPathVariables,
+  resolveVariables as applyVariables,
+} from '../utils/pathVariables';
+import {
+  discoverBuildPairsInRoots,
+  DiscoveredBuildPair,
+} from '../utils/buildDiscovery';
+import { UserCancelledError } from '../utils/errors';
+import { assertCustomBuildPairComplete } from '../utils/customBuildPaths';
+import {
+  BuildOutputPaths,
+  findPreferredBuildOutput,
+} from '../utils/buildPairs';
 
 export interface BuildPaths {
   map: string;
@@ -25,24 +38,27 @@ interface ResolvedBuildPair {
 
 type BuildSelection =
   | { kind: 'manual'; pair: ResolvedBuildPair }
-  | { kind: 'auto'; folder: string };
+  | { kind: 'auto'; pair: ResolvedBuildPair };
 
 export class BuildFolderResolver {
-  private readonly debug: boolean;
-  private workspaceRoot?: string;
-  private autoDisplayNames = new Map<string, string>();
+  private workspaceRoots: Array<{ name: string; path: string }> = [];
+  private lastToolchainWarning?: string;
 
-  constructor(private readonly context: vscode.ExtensionContext) {
-    this.debug = vscode.workspace
+  private get debug(): boolean {
+    return vscode.workspace
       .getConfiguration('stm32BuildAnalyzerEnhanced')
       .get<boolean>('debug') ?? false;
   }
 
-  public async resolve(): Promise<BuildPaths> {
+  public async resolve(
+    signal?: AbortSignal,
+    preferredPaths?: BuildOutputPaths
+  ): Promise<BuildPaths> {
     const cfg = vscode.workspace.getConfiguration('stm32BuildAnalyzerEnhanced');
     const customMap = cfg.get<string>('mapFilePath');
     const customElf = cfg.get<string>('elfFilePath');
     const manualPairs = cfg.get<ManualBuildPair[]>('manualBuildPairs') ?? [];
+    assertCustomBuildPairComplete(customMap, customElf);
 
     if (this.debug) {
       console.log('[STM32] Resolving build paths...');
@@ -55,23 +71,38 @@ export class BuildFolderResolver {
 
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const resolvedCustomMap = customMap
-      ? this.resolveCustomPath(this.resolveVariables(customMap), workspaceRoot)
+      ? this.resolveCustomPath(
+        this.resolveRequiredVariables(customMap, 'mapFilePath'),
+        workspaceRoot
+      )
       : undefined;
     const resolvedCustomElf = customElf
-      ? this.resolveCustomPath(this.resolveVariables(customElf), workspaceRoot)
+      ? this.resolveCustomPath(
+        this.resolveRequiredVariables(customElf, 'elfFilePath'),
+        workspaceRoot
+      )
       : undefined;
 
-    if (
-      resolvedCustomMap
-      && resolvedCustomElf
-      && await this.exists(resolvedCustomMap)
-      && await this.exists(resolvedCustomElf)
-    ) {
+    if (resolvedCustomMap && resolvedCustomElf) {
+      const [mapExists, elfExists] = await Promise.all([
+        this.exists(resolvedCustomMap),
+        this.exists(resolvedCustomElf),
+      ]);
+      if (!mapExists || !elfExists) {
+        const missing = [
+          !mapExists ? `mapFilePath: ${resolvedCustomMap}` : undefined,
+          !elfExists ? `elfFilePath: ${resolvedCustomElf}` : undefined,
+        ].filter((value): value is string => Boolean(value));
+        throw new Error(
+          `STM32 Build Analyzer: configured build file(s) are not accessible: `
+          + missing.join('; ')
+        );
+      }
       if (this.debug) {console.log('[STM32] Using custom paths from settings.');}
       return {
         map: resolvedCustomMap,
         elf: resolvedCustomElf,
-        toolchainPath: await this.getToolchainPath(),
+        toolchainPath: await this.resolveToolchainPath(),
       };
     }
 
@@ -81,30 +112,45 @@ export class BuildFolderResolver {
     }
 
     const root = workspaceFolders[0].uri.fsPath;
-    this.workspaceRoot = root;
+    this.workspaceRoots = workspaceFolders.map(folder => ({
+      name: folder.name,
+      path: folder.uri.fsPath,
+    }));
 
-    if (this.debug) {console.log(`[STM32] Scanning workspace folder: ${root}`);}
-
-    const resolvedManualPairs = await this.resolveManualPairs(root, manualPairs);
-    const folders = await this.findBuildFolders(root);
-    this.autoDisplayNames = new Map();
-    folders.forEach(folder => {
-      this.autoDisplayNames.set(folder, this.getBuildDisplayName(folder));
-    });
-    const selections = this.buildSelections(resolvedManualPairs, folders);
-    if (selections.length === 0) {
-      throw new Error('No build folders containing both .map and .elf found');
+    if (this.debug) {
+      this.workspaceRoots.forEach(folder =>
+        console.log(`[STM32] Scanning workspace folder: ${folder.path}`)
+      );
     }
 
-    let selection = selections[0];
-    if (selections.length > 1) {
+    const resolvedManualPairs = await this.resolveManualPairs(root, manualPairs);
+    const autoPairs = await this.findBuildPairs(
+      this.workspaceRoots.map(folder => folder.path),
+      signal
+    );
+    const selections = this.buildSelections(resolvedManualPairs, autoPairs);
+    if (selections.length === 0) {
+      throw new Error(
+        'No matching .map/.elf build outputs found. Automatic discovery requires '
+        + 'the same basename; configure a manual pair when output names differ.'
+      );
+    }
+
+    const preferredPair = findPreferredBuildOutput(
+      selections.map(candidate => candidate.pair),
+      preferredPaths
+    );
+    let selection = preferredPair
+      ? selections.find(candidate => candidate.pair === preferredPair)!
+      : selections[0];
+    if (selections.length > 1 && !preferredPair) {
       if (this.debug) {
         console.log(`[STM32] Multiple build targets found:`);
         selections.forEach(s => {
           if (s.kind === 'manual') {
             console.log(` → Manual: ${s.pair.folder}`);
           } else {
-            console.log(` → Auto: ${s.folder}`);
+            console.log(` → Auto: ${s.pair.map} + ${s.pair.elf}`);
           }
         });
       }
@@ -114,59 +160,68 @@ export class BuildFolderResolver {
         { placeHolder: 'Select build output or manual map/elf pair' }
       );
       if (!pick) {
-        throw new Error('Build folder selection cancelled');
+        throw new UserCancelledError('Build output selection cancelled');
       }
       selection = pick.selection;
     }
 
-    if (selection.kind === 'manual') {
-      if (this.debug) {
-        console.log(`[STM32] Selected manual pair: ${selection.pair.map} + ${selection.pair.elf}`);
-      }
-      return {
-        map: selection.pair.map,
-        elf: selection.pair.elf,
-        toolchainPath: await this.getToolchainPath(),
-      };
-    }
-
-    if (this.debug) {console.log(`[STM32] Selected folder: ${selection.folder}`);}
-
-    const mapFile = await this.findFile(selection.folder, '.map');
-    const elfFile = await this.findFile(selection.folder, '.elf');
-    if (!mapFile || !elfFile) {
-      throw new Error(`Missing .map or .elf in ${selection.folder}`);
+    if (this.debug) {
+      console.log(
+        `[STM32] Selected ${selection.kind} pair: `
+        + `${selection.pair.map} + ${selection.pair.elf}`
+      );
     }
 
     return {
-      map: mapFile,
-      elf: elfFile,
-      toolchainPath: await this.getToolchainPath(),
+      map: selection.pair.map,
+      elf: selection.pair.elf,
+      toolchainPath: await this.resolveToolchainPath(),
     };
   }
 
-  private async getToolchainPath(): Promise<string | undefined> {
+  public async resolveToolchainPath(): Promise<string | undefined> {
     const cfg = vscode.workspace.getConfiguration('stm32BuildAnalyzerEnhanced');
     const raw = cfg.get<string>('toolchainPath');
 
-    if (!raw) {return undefined;}
+    if (!raw) {
+      this.lastToolchainWarning = undefined;
+      return undefined;
+    }
 
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const resolved = this.resolveCustomPath(this.resolveVariables(raw), workspaceRoot);
+    const resolvedVariables = this.resolveVariables(raw);
+    const unresolved = findUnresolvedPathVariables(resolvedVariables);
+    if (unresolved.length > 0) {
+      this.showToolchainWarning(
+        `STM32 Build Analyzer: toolchainPath contains unresolved variable(s): `
+        + `${unresolved.join(', ')}. Check environment variables and workspace folder names.`
+      );
+      return undefined;
+    }
+    const resolved = this.resolveCustomPath(resolvedVariables, workspaceRoot);
     if (!resolved) {return undefined;}
 
     if (await this.exists(resolved)) {
       if (this.debug) {console.log(`[STM32] Using toolchain: ${resolved}`);}
+      this.lastToolchainWarning = undefined;
       return resolved;
     }
 
-    vscode.window.showWarningMessage(
+    this.showToolchainWarning(
       `STM32 Build Analyzer: toolchainPath not found: ${resolved}`
       + (resolved !== raw ? ` (resolved from: ${raw})` : '')
     );
     if (this.debug) {console.warn(`[STM32] Toolchain path not found: ${resolved}`);}
 
     return undefined;
+  }
+
+  private showToolchainWarning(message: string): void {
+    if (message === this.lastToolchainWarning) {
+      return;
+    }
+    this.lastToolchainWarning = message;
+    vscode.window.showWarningMessage(message);
   }
 
   private async exists(filePath: string): Promise<boolean> {
@@ -179,115 +234,61 @@ export class BuildFolderResolver {
     }
   }
 
-  private async findBuildFolders(root: string): Promise<string[]> {
-    const found = new Set<string>();
-    const ignored = new Set(['node_modules', '.git', '.vscode', 'dist']);
-    const visited = new Set<string>();
-
-    const walk = (dir: string) => {
-      try {
-        const realPath = fs.realpathSync(dir);
-        if (visited.has(realPath)) {
-          return;
-        }
-        visited.add(realPath);
-
-        let hasMap = false, hasElf = false;
-        for (const d of fs.readdirSync(dir, { withFileTypes: true })) {
-          const full = path.join(dir, d.name);
-          if (d.isDirectory()) {
-            if (!ignored.has(d.name)) {
-              walk(full);
-            }
-          } else if (d.isSymbolicLink()) {
-            try {
-              const stats = fs.statSync(full);
-              if (stats.isDirectory() && !ignored.has(d.name)) {
-                walk(full);
-              }
-            } catch (err) {
-              if (this.debug) {console.warn(`[STM32] Failed to stat symlink: ${full}`);}
-            }
-          } else if (d.name.toLowerCase().endsWith('.map')) {
-            hasMap = true;
-          } else if (d.name.toLowerCase().endsWith('.elf')) {
-            hasElf = true;
-          }
-        }
-        if (hasMap && hasElf) {
-          if (this.debug) {console.log(`[STM32] Found build folder: ${dir}`);}
-          found.add(dir);
-        }
-      } catch (err) {
-        if (this.debug) {console.warn(`[STM32] Failed to access folder: ${dir}`);}
-      }
-    };
-
-    walk(root);
-
-    return Array.from(found);
-  }
-
-  private async findFile(folder: string, ext: string): Promise<string | undefined> {
-    const extLower = ext.toLowerCase();
-    const files = fs.readdirSync(folder).filter(f => f.toLowerCase().endsWith(extLower));
-    if (files.length === 0) {
-      if (this.debug) {console.warn(`[STM32] No ${ext} files in ${folder}`);}
-      return undefined;
+  private async findBuildPairs(
+    roots: readonly string[],
+    signal?: AbortSignal
+  ): Promise<ResolvedBuildPair[]> {
+    const found: DiscoveredBuildPair[] = await discoverBuildPairsInRoots(roots, signal);
+    if (this.debug) {
+      found.forEach(pair =>
+        console.log(`[STM32] Found build pair: ${pair.map} + ${pair.elf}`)
+      );
     }
-
-    files.sort((a, b) => {
-      if (a.includes('Release')) {return -1;}
-      if (b.includes('Release')) {return 1;}
-      if (a.includes('Debug')) {return -1;}
-      if (b.includes('Debug')) {return 1;}
-      return 0;
-    });
-
-    const p = path.join(folder, files[0]);
-
-    try {
-      fs.accessSync(p, fs.constants.R_OK);
-
-      if (ext === '.map' && fs.statSync(p).size === 0) {
-        throw new Error('Map file is empty');
-      }
-
-      if (this.debug) {console.log(`[STM32] Selected ${ext} file: ${p}`);}
-      return p;
-    } catch (err) {
-      if (this.debug) {console.warn(`[STM32] Could not use file: ${p}`);}
-      return undefined;
-    }
+    return found;
   }
 
   private async resolveManualPairs(root: string, pairs: ManualBuildPair[]): Promise<ResolvedBuildPair[]> {
     const resolved: ResolvedBuildPair[] = [];
 
-    for (const pair of pairs) {
+    for (const [index, pair] of pairs.entries()) {
+      const entryName = pair.label || `#${index + 1}`;
       if (!pair.folder || !pair.map || !pair.elf) {
-        if (this.debug) {console.warn('[STM32] Skipping invalid manual pair entry.');}
-        continue;
+        throw new Error(
+          `STM32 Build Analyzer: manualBuildPairs entry "${entryName}" must define `
+          + 'folder, map, and elf.'
+        );
       }
 
-      const folderPath = path.isAbsolute(pair.folder)
-        ? pair.folder
-        : path.join(root, pair.folder);
-      const mapPath = path.isAbsolute(pair.map)
-        ? pair.map
-        : path.join(folderPath, pair.map);
-      const elfPath = path.isAbsolute(pair.elf)
-        ? pair.elf
-        : path.join(folderPath, pair.elf);
+      const resolvedFolder = this.resolveVariables(pair.folder);
+      const resolvedMap = this.resolveVariables(pair.map);
+      const resolvedElf = this.resolveVariables(pair.elf);
+      const unresolved = findUnresolvedPathVariables(
+        `${resolvedFolder}\n${resolvedMap}\n${resolvedElf}`
+      );
+      if (unresolved.length > 0) {
+        throw new Error(
+          `STM32 Build Analyzer: manualBuildPairs entry "${pair.label ?? pair.folder}" `
+          + `contains unresolved variable(s): ${unresolved.join(', ')}.`
+        );
+      }
+      const folderPath = path.isAbsolute(resolvedFolder)
+        ? resolvedFolder
+        : path.join(root, resolvedFolder);
+      const mapPath = path.isAbsolute(resolvedMap)
+        ? resolvedMap
+        : path.join(folderPath, resolvedMap);
+      const elfPath = path.isAbsolute(resolvedElf)
+        ? resolvedElf
+        : path.join(folderPath, resolvedElf);
 
       const mapOk = await this.exists(mapPath);
       const elfOk = await this.exists(elfPath);
 
       if (!mapOk || !elfOk) {
-        if (this.debug) {
-          console.warn(`[STM32] Manual pair not accessible: ${mapPath} ${elfPath}`);
-        }
-        continue;
+        throw new Error(
+          `STM32 Build Analyzer: manualBuildPairs entry "${entryName}" is not accessible: `
+          + `${!mapOk ? mapPath : ''}${!mapOk && !elfOk ? '; ' : ''}${!elfOk ? elfPath : ''}`
+        );
       }
 
       resolved.push({
@@ -302,8 +303,28 @@ export class BuildFolderResolver {
   }
 
   private resolveVariables(value: string): string {
-    const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    return applyVariables(value, wsRoot);
+    const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
+    const wsRoot = workspaceFolders[0]?.uri.fsPath;
+    return applyVariables(
+      value,
+      wsRoot,
+      workspaceFolders.map(folder => ({
+        name: folder.name,
+        path: folder.uri.fsPath,
+      }))
+    );
+  }
+
+  private resolveRequiredVariables(value: string, setting: string): string {
+    const resolved = this.resolveVariables(value);
+    const unresolved = findUnresolvedPathVariables(resolved);
+    if (unresolved.length > 0) {
+      throw new Error(
+        `STM32 Build Analyzer: ${setting} contains unresolved variable(s): `
+        + `${unresolved.join(', ')}. Check environment variables and workspace folder names.`
+      );
+    }
+    return resolved;
   }
 
   private resolveCustomPath(value: string, root?: string): string | undefined {
@@ -316,39 +337,29 @@ export class BuildFolderResolver {
     return path.join(root, value);
   }
 
-  private buildSelections(manualPairs: ResolvedBuildPair[], folders: string[]): BuildSelection[] {
+  private buildSelections(
+    manualPairs: ResolvedBuildPair[],
+    autoPairs: ResolvedBuildPair[]
+  ): BuildSelection[] {
     const selections: BuildSelection[] = [];
     manualPairs.forEach(pair => selections.push({ kind: 'manual', pair }));
-    folders.forEach(folder => selections.push({ kind: 'auto', folder }));
+    autoPairs.forEach(pair => selections.push({ kind: 'auto', pair }));
     return selections;
-  }
-
-  private getBuildDisplayName(folder: string): string {
-    try {
-      const files = fs.readdirSync(folder);
-      const elf = files.find(file => file.toLowerCase().endsWith('.elf'));
-      if (elf) {
-        return path.basename(elf).replace(/\.elf$/i, '');
-      }
-      const map = files.find(file => file.toLowerCase().endsWith('.map'));
-      if (map) {
-        return path.basename(map).replace(/\.map$/i, '');
-      }
-    } catch (err) {
-      if (this.debug) {
-        console.warn(`[STM32] Failed to read build folder: ${folder}`);
-      }
-    }
-    return path.basename(folder);
   }
 
   private toQuickPick(selection: BuildSelection): vscode.QuickPickItem & { selection: BuildSelection } {
     const resolveRelative = (value: string) => {
-      if (!this.workspaceRoot) {
+      const workspace = this.workspaceRoots.find(folder => {
+        const relative = path.relative(folder.path, value);
+        return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+      });
+      if (!workspace) {
         return value;
       }
-      const relative = path.relative(this.workspaceRoot, value);
-      return relative || path.basename(value);
+      const relative = path.relative(workspace.path, value) || path.basename(value);
+      return this.workspaceRoots.length > 1
+        ? `${workspace.name}/${relative}`
+        : relative;
     };
 
     if (selection.kind === 'manual') {
@@ -361,11 +372,9 @@ export class BuildFolderResolver {
       };
     }
 
-    const displayName = this.autoDisplayNames.get(selection.folder) ?? this.getBuildDisplayName(selection.folder);
-
     return {
-      label: `$(file-binary) ${displayName}`,
-      detail: resolveRelative(selection.folder),
+      label: `$(file-binary) ${selection.pair.label}`,
+      detail: `${resolveRelative(selection.pair.elf)} | ${resolveRelative(selection.pair.map)}`,
       selection,
     };
   }

@@ -1,6 +1,9 @@
 import * as assert from 'assert';
 import * as os from 'os';
-import { resolveVariables } from '../utils/pathVariables';
+import {
+  findUnresolvedPathVariables,
+  resolveVariables,
+} from '../utils/pathVariables';
 
 suite('resolveVariables', () => {
 
@@ -30,11 +33,11 @@ suite('resolveVariables', () => {
       delete process.env._STM32_TEST_VAR;
     });
 
-    test('expands to empty string for an unset variable', () => {
+    test('leaves an unset variable unchanged for a clear diagnostic', () => {
       delete process.env._STM32_UNSET_VAR;
       assert.strictEqual(
         resolveVariables('${env:_STM32_UNSET_VAR}/bin'),
-        '/bin'
+        '${env:_STM32_UNSET_VAR}/bin'
       );
     });
 
@@ -50,6 +53,35 @@ suite('resolveVariables', () => {
     });
   });
 
+  suite('unresolved variables', () => {
+    test('finds unresolved environment and workspace variables', () => {
+      assert.deepStrictEqual(
+        findUnresolvedPathVariables(
+          '${env:MISSING}/${workspaceFolder:Unknown}/${workspaceFolder}'
+        ),
+        [
+          '${env:MISSING}',
+          '${workspaceFolder:Unknown}',
+          '${workspaceFolder}',
+        ]
+      );
+    });
+
+    test('deduplicates repeated unresolved variables', () => {
+      assert.deepStrictEqual(
+        findUnresolvedPathVariables('${env:MISSING}/${env:MISSING}'),
+        ['${env:MISSING}']
+      );
+    });
+
+    test('ignores unrelated unsupported tokens', () => {
+      assert.deepStrictEqual(
+        findUnresolvedPathVariables('${someOtherToken}/bin'),
+        []
+      );
+    });
+  });
+
   suite('${workspaceFolder}', () => {
     test('expands when workspaceRoot is provided', () => {
       assert.strictEqual(
@@ -62,6 +94,68 @@ suite('resolveVariables', () => {
       assert.strictEqual(
         resolveVariables('${workspaceFolder}/build'),
         '${workspaceFolder}/build'
+      );
+    });
+  });
+
+  suite('${workspaceFolder:Name}', () => {
+    const workspaceFolders = [
+      { name: 'Application', path: '/work/product-a-application' },
+      { name: 'Toolchain', path: '/work/toolchain' },
+    ];
+
+    test('expands a named folder in a multi-root workspace', () => {
+      assert.strictEqual(
+        resolveVariables(
+          '${workspaceFolder:Toolchain}/arm-gnu-toolchain/bin',
+          workspaceFolders[0].path,
+          workspaceFolders
+        ),
+        '/work/toolchain/arm-gnu-toolchain/bin'
+      );
+    });
+
+    test('expands named and unnamed workspace folders independently', () => {
+      assert.strictEqual(
+        resolveVariables(
+          '${workspaceFolder}/build:${workspaceFolder:Toolchain}/bin',
+          workspaceFolders[0].path,
+          workspaceFolders
+        ),
+        '/work/product-a-application/build:/work/toolchain/bin'
+      );
+    });
+
+    test('expands multiple named folders', () => {
+      assert.strictEqual(
+        resolveVariables(
+          '${workspaceFolder:Application}:${workspaceFolder:Toolchain}',
+          workspaceFolders[0].path,
+          workspaceFolders
+        ),
+        '/work/product-a-application:/work/toolchain'
+      );
+    });
+
+    test('leaves an unknown named folder unchanged for a clear diagnostic', () => {
+      assert.strictEqual(
+        resolveVariables(
+          '${workspaceFolder:Missing}/bin',
+          workspaceFolders[0].path,
+          workspaceFolders
+        ),
+        '${workspaceFolder:Missing}/bin'
+      );
+    });
+
+    test('matches workspace folder names exactly', () => {
+      assert.strictEqual(
+        resolveVariables(
+          '${workspaceFolder:toolchain}/bin',
+          workspaceFolders[0].path,
+          workspaceFolders
+        ),
+        '${workspaceFolder:toolchain}/bin'
       );
     });
   });
