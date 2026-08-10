@@ -2,24 +2,16 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Region } from '../models';
-
-function getNonce(): string {
-  let text = '';
-  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  for (let i = 0; i < 32; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  return text;
-}
+import { createNonce } from '../utils/nonce';
 
 export class WebviewRenderer {
-  private readonly debug: boolean;
-
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly view: vscode.WebviewView
-  ) {
-    this.debug = vscode.workspace
+  ) {}
+
+  private get debug(): boolean {
+    return vscode.workspace
       .getConfiguration('stm32BuildAnalyzerEnhanced')
       .get<boolean>('debug') ?? false;
   }
@@ -55,7 +47,11 @@ export class WebviewRenderer {
     });
   }
 
-  public showData(regions: Region[], buildFolder: string) {
+  public showData(
+    regions: Region[],
+    buildFolder: string,
+    warnings: readonly string[] = []
+  ): void {
     if (this.debug) {
       console.log(`[STM32 Webview] Sending ${regions.length} region(s) to webview.`);
     }
@@ -63,7 +59,15 @@ export class WebviewRenderer {
     this.view.webview.postMessage({
       command: 'showMapData',
       data: regions,
-      currentBuildFolderRelativePath: buildFolder
+      currentBuildFolderRelativePath: buildFolder,
+      warnings,
+    });
+  }
+
+  public showError(message: string): void {
+    this.view.webview.postMessage({
+      command: 'showAnalysisError',
+      message,
     });
   }
 
@@ -99,7 +103,7 @@ export class WebviewRenderer {
     const webview = this.view.webview;
     const extensionPath = this.context.extensionPath;
 
-    const nonce = getNonce();
+    const nonce = createNonce();
     const csp = `default-src 'none'; img-src ${webview.cspSource} blob:; script-src 'nonce-${nonce}' ${webview.cspSource}; style-src ${webview.cspSource} 'unsafe-inline';`;
 
     const scriptUri = webview.asWebviewUri(

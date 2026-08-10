@@ -1,5 +1,16 @@
 // Build Analyzer Webview Script
 // This script runs inside the VS Code webview
+import { findByKey } from '../src/utils/keyLookup';
+import {
+    calculateUsagePercent,
+    clampProgressPercent,
+} from '../src/utils/usage';
+import { createTextMatcher } from '../src/utils/textSearch';
+import {
+    createAnalysisFailureUiState,
+    createSingleViewRenderPlan,
+    getStoredSortDirective,
+} from '../src/utils/viewRendering';
 
 declare function acquireVsCodeApi(): {
     postMessage(message: unknown): void;
@@ -126,7 +137,8 @@ function fillTableRegions(regions: Region[], tableBody: HTMLTableSectionElement,
         id++;
         const regionId = id;
         const regionKey = buildRegionKey(region);
-        const percent = region.used / region.size * 100;
+        const percent = calculateUsagePercent(region.used, region.size);
+        const progressWidth = clampProgressPercent(percent);
 
         const tableTr = document.createElement('tr');
         tableTr.className = 'toggleTr level-1';
@@ -144,7 +156,7 @@ function fillTableRegions(regions: Region[], tableBody: HTMLTableSectionElement,
         bar.className = 'bar';
         const progress = document.createElement('div');
         progress.setAttribute('style', `
-            width: ${percent}%; 
+            width: ${progressWidth}%;
             background-color: ${percent > 95 ? 'var(--vscode-minimap-errorHighlight)' : 
                              percent > 75 ? 'var(--vscode-minimap-warningHighlight)' : 
                              'var(--vscode-minimap-infoHighlight)'}; 
@@ -393,31 +405,11 @@ function performSearch(query: string, table: HTMLTableElement): void {
 
     let matcher: (text: string) => boolean;
     try {
-        if (useRegex) {
-            const flags = caseSensitive ? '' : 'i';
-            const pattern = wholeWord ? '\\b' + normalizedQuery + '\\b' : normalizedQuery;
-            const regex = new RegExp(pattern, flags);
-            matcher = (text: string) => regex.test(text);
-        } else {
-            const searchQuery = caseSensitive ? normalizedQuery : normalizedQuery.toLowerCase();
-            if (wholeWord) {
-                matcher = (text: string) => {
-                    const searchIn = caseSensitive ? text : text.toLowerCase();
-                    const idx = searchIn.indexOf(searchQuery);
-                    if (idx === -1) {
-                      return false;
-                    }
-                    const before = idx === 0 || !/[a-zA-Z0-9_]/.test(searchIn[idx - 1]);
-                    const after = idx + searchQuery.length >= searchIn.length || !/[a-zA-Z0-9_]/.test(searchIn[idx + searchQuery.length]);
-                    return before && after;
-                };
-            } else {
-                matcher = (text: string) => {
-                    const searchIn = caseSensitive ? text : text.toLowerCase();
-                    return searchIn.includes(searchQuery);
-                };
-            }
-        }
+        matcher = createTextMatcher(normalizedQuery, {
+            caseSensitive,
+            wholeWord,
+            useRegex
+        });
     } catch (e) {
         if (searchMatchCount) {
           searchMatchCount.textContent = 'Invalid regex';
@@ -714,7 +706,8 @@ function setRowSelection(row: HTMLTableRowElement | null): void {
 }
 
 function syncRowSelection(): void {
-    if (!selectedRowKey) {
+    const key = selectedRowKey;
+    if (!key) {
         return;
     }
     (Object.keys(viewConfigs) as ViewMode[]).forEach(view => {
@@ -722,7 +715,11 @@ function syncRowSelection(): void {
         if (!table) {
             return;
         }
-        const row = table.querySelector<HTMLTableRowElement>(`tr[data-key="${selectedRowKey}"]`);
+        const row = findByKey(
+            table.querySelectorAll<HTMLTableRowElement>('tr[data-key]'),
+            key,
+            candidate => candidate.dataset.key
+        );
         if (row) {
             row.classList.add('row-selected');
         }
@@ -904,6 +901,7 @@ function setView(nextView: ViewMode): void {
     document.body.classList.toggle('table-view', currentView === 'table');
     viewConfigs.classic.container?.classList.toggle('is-hidden', currentView !== 'classic');
     viewConfigs.table.container?.classList.toggle('is-hidden', currentView !== 'table');
+    renderTables(lastRegions);
 
     const searchInput = document.getElementById('searchInput') as HTMLInputElement | null;
     if (searchInput && searchInput.value) {
@@ -923,19 +921,33 @@ function setView(nextView: ViewMode): void {
 
 function renderTables(regions: Region[]): void {
     const icons = getIconUris();
+    const views = Object.keys(viewConfigs) as ViewMode[];
+    const plan = createSingleViewRenderPlan(views, currentView);
+    plan.clear.forEach(view => resetTableRegions(viewConfigs[view].body));
 
-    (Object.keys(viewConfigs) as ViewMode[]).forEach(view => {
-        const config = viewConfigs[view];
-        if (!config.body) {
-            return;
-        }
+    const config = viewConfigs[plan.render];
+    if (config.body) {
         resetTableRegions(config.body);
         fillTableRegions(regions, config.body, icons);
-        updateSortIndicators(view, sortStates[view]);
-    });
+        const sort = getStoredSortDirective(sortStates[plan.render]);
+        if (sort) {
+            applySorting(sort.field, sort.isAscending, config.body, plan.render);
+        }
+        updateSortIndicators(plan.render, sortStates[plan.render]);
+    }
     syncExpandedState();
     syncRowSelection();
     syncSelectionCheckboxes();
+}
+
+function showAnalysisStatus(message?: string, level: 'error' | 'warning' = 'error'): void {
+    const status = document.getElementById('analysisStatus');
+    if (!status) {
+        return;
+    }
+    status.textContent = message ?? '';
+    status.classList.toggle('is-hidden', !message);
+    status.classList.toggle('is-warning', Boolean(message) && level === 'warning');
 }
 
 // Initialize when DOM is ready
@@ -1081,6 +1093,12 @@ window.addEventListener('message', (event: MessageEvent) => {
     switch (message.command) {
         case 'showMapData':
             lastRegions = message.data || [];
+            showAnalysisStatus(
+                Array.isArray(message.warnings) && message.warnings.length > 0
+                    ? message.warnings.join('\n')
+                    : undefined,
+                'warning'
+            );
             selectedKeys.clear();
             showSelectedOnly = false;
             renderTables(lastRegions);
@@ -1100,6 +1118,28 @@ window.addEventListener('message', (event: MessageEvent) => {
                 if (table) {
                     performSearch(searchInput.value.trim(), table);
                 }
+            }
+            break;
+        case 'showAnalysisError':
+            const failureState = createAnalysisFailureUiState(message.message);
+            lastRegions = [];
+            expandedKeys.clear();
+            selectedKeys.clear();
+            selectedRowKey = null;
+            showSelectedOnly = false;
+            renderTables([]);
+            showAnalysisStatus(failureState.status);
+            const failedBuildFolder = document.getElementById('buildFolderPath');
+            if (failedBuildFolder) {
+                failedBuildFolder.textContent = failureState.buildFolder;
+            }
+            const selectionToggle = document.getElementById('toggleSelectionButton');
+            if (selectionToggle) {
+                selectionToggle.textContent = failureState.selectionToggle;
+            }
+            const failedSearchMatchCount = document.getElementById('searchMatchCount');
+            if (failedSearchMatchCount) {
+                failedSearchMatchCount.textContent = failureState.searchMatchCount;
             }
             break;
         case 'restoreScroll':

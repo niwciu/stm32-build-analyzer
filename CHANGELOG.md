@@ -1,4 +1,54 @@
 # Changelog
+## [1.1.7] – 2026-08-04
+
+### Fixed
+- Pass the resolved `toolchainPath` to the ELF parser so workspace-relative paths and `${userHome}`, `${workspaceFolder}`, and `${env:VAR}` variables work end to end.
+- Resolve named multi-root workspace variables such as `${workspaceFolder:Toolchain}` in toolchain, MAP, and ELF paths.
+- Pair automatically discovered MAP and ELF files by basename so outputs from different targets are never combined silently.
+- Count every initialized RAM section with a distinct ELF load image in both its runtime region and its Flash load region, rather than special-casing only `.data`.
+- Clear stale analysis results after a failed refresh and show the failure persistently inside the webview.
+- Reject empty, unreadable, or unsupported MAP files with an actionable error that identifies the selected file.
+- Preserve valid memory-region usage when `nm` fails and label symbol/source data as incomplete inside the webview; `objdump` remains required.
+- Watch the exact selected MAP and ELF paths, including `.out` and extensionless manual outputs, and detect case variations of automatic `.map`/`.elf` files.
+- Preserve demangled symbol names and source paths containing spaces, and resolve relative source paths from the original ELF directory.
+- Run recursive build discovery with asynchronous filesystem operations and skip directory symlinks and tooling/dependency output folders.
+- Run `objdump` and `nm` asynchronously with bounded output and a 30-second timeout so analysis cannot indefinitely block the extension host.
+- Synchronize selected webview rows by exact key comparison instead of embedding ELF-derived text in CSS selectors.
+- Scan every root in multi-root workspaces, deduplicate overlapping roots, resolve variables in manual pairs, and display paths relative to the owning workspace folder.
+- Report unset environment variables and unknown workspace-folder variables explicitly instead of silently replacing them or redirecting relative paths.
+- Render zero-sized or malformed memory regions with a finite percentage and clamp visual progress bars without hiding over-capacity usage.
+- Check every occurrence during whole-word symbol search instead of rejecting a row when only its first occurrence is embedded in another identifier.
+- Treat build-output Quick Pick cancellation as a user action, keep the previous selection, and avoid showing an error.
+- Keep rows only for the active webview table instead of building duplicate DOM trees for large symbol sets.
+- Generate webview Content Security Policy nonces from cryptographically secure random bytes.
+- Include webview TypeScript in the standard lint command.
+- Add CI for extension-host tests, linting/compilation, runtime dependency audit, production bundling, and VSIX content validation.
+- Replace the vulnerable VS Code test CLI dependency with a direct `@vscode/test-electron` runner and patched Mocha dependency chain.
+- Disable production source maps and exclude any stale map artifacts from packaged VSIX files.
+- Cancel superseded filesystem discovery and native tool processes when a newer refresh starts.
+- Enable unused-code, implicit-return, and switch-fallthrough TypeScript checks.
+- Treat explicit MAP/ELF and manual-pair settings as authoritative and report partial or inaccessible configurations instead of silently falling back to discovery.
+- Restore automatic discovery for firmware projects that use an output directory named `out`.
+- Preserve the active symbol sort order and indicator when switching between Classic and Table views.
+- Apply `toolchainPath` changes without rescanning or reopening selection for an already selected MAP/ELF pair.
+- Refresh multi-root workspace state when folders change while silently retaining a still-valid build selection.
+- Suppress toolchain warnings produced by a refresh that has already been superseded.
+- Preserve the selected configuration scope when adding manual build pairs and reject whitespace-only paths.
+- Clear stale symbol-search status text when an analysis failure replaces the current result.
+- Apply changes to toolchain, map, ELF, and manual-pair settings without requiring a VS Code window reload.
+- Reset tool discovery to `PATH` when `toolchainPath` is cleared.
+- Show actionable errors when `objdump` or `nm` cannot run or exits unsuccessfully instead of silently rendering `0 B` memory usage.
+- Warn when a configured toolchain directory is missing required binaries while preserving per-tool fallback to `PATH`.
+- Reject mismatched map/ELF pairs when no allocatable ELF sections match the map memory regions.
+
+### Changed
+- Disable native tool execution in untrusted workspaces and mark `toolchainPath` as a restricted workspace setting.
+- Debug logging configuration now takes effect without reloading the extension.
+- Added regression coverage for resolved toolchain wiring, tool fallback, execution failures, and required binary validation.
+- Corrected VSIX contents so compiled entry points and view icons are included while development-only files and dependencies are excluded.
+- Added Windows extension-host CI coverage and negative checks for development files in packaged VSIX artifacts.
+- Added a disposable multi-root integration fixture that verifies named workspace variables and configuration/workspace refresh events through the real resolver.
+
 ## [1.1.6] – 2026-06-06
 
 ### Added

@@ -2,7 +2,7 @@
   "name": "stm32-build-analyzer-enhanced",
   "displayName": "STM32 Build Analyzer (Enhanced)",
   "description": "STM32 Build Analyzer for VSCode - Fork of ATwice291/stm32-build-analyzer with additional features...",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "publisher": "niwciu",
   "license": "MIT",
   "icon": "images/icon2.png",
@@ -12,6 +12,15 @@
   "categories": [
     "Other"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Build analysis is disabled until the workspace is trusted because the extension executes native objdump and nm tools.",
+      "restrictedConfigurations": [
+        "stm32BuildAnalyzerEnhanced.toolchainPath"
+      ]
+    }
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/niwciu/stm32-build-analyzer.git"
@@ -47,17 +56,17 @@
         "stm32BuildAnalyzerEnhanced.mapFilePath": {
           "type": "string",
           "default": "",
-          "description": "Path to the .map file (overrides automatic search). Supports absolute paths, workspace-relative paths, and variables: ${userHome}, ${workspaceFolder}, ${env:VAR}."
+          "description": "Path to the .map file (overrides automatic search). Supports absolute paths, workspace-relative paths, and variables: ${userHome}, ${workspaceFolder}, ${workspaceFolder:Name}, ${env:VAR}."
         },
         "stm32BuildAnalyzerEnhanced.elfFilePath": {
           "type": "string",
           "default": "",
-          "description": "Path to the .elf file (overrides automatic search). Supports absolute paths, workspace-relative paths, and variables: ${userHome}, ${workspaceFolder}, ${env:VAR}."
+          "description": "Path to the .elf file (overrides automatic search). Supports absolute paths, workspace-relative paths, and variables: ${userHome}, ${workspaceFolder}, ${workspaceFolder:Name}, ${env:VAR}."
         },
         "stm32BuildAnalyzerEnhanced.toolchainPath": {
           "type": "string",
           "default": "",
-          "description": "Path to the ARM GNU Embedded toolchain binaries directory (containing arm-none-eabi-objdump, arm-none-eabi-nm, etc.). Supports absolute paths, workspace-relative paths, and variables: ${userHome}, ${workspaceFolder}, ${env:VAR}. If not set, tools are resolved from PATH."
+          "description": "Path to the ARM GNU Embedded toolchain binaries directory (containing arm-none-eabi-objdump, arm-none-eabi-nm, etc.). Supports absolute paths, workspace-relative paths, and variables: ${userHome}, ${workspaceFolder}, ${workspaceFolder:Name}, ${env:VAR}. If not set, tools are resolved from PATH."
         },
         "stm32BuildAnalyzerEnhanced.debug": {
           "type": "boolean",
@@ -67,7 +76,7 @@
         "stm32BuildAnalyzerEnhanced.manualBuildPairs": {
           "type": "array",
           "default": [],
-          "description": "Optional list of manual map/elf pairs to use when file names differ or outputs live outside standard build folders.",
+          "description": "Optional list of manual map/elf pairs to use when file names differ or outputs live outside standard build folders. Path fields support ${userHome}, ${workspaceFolder}, ${workspaceFolder:Name}, and ${env:VAR}.",
           "items": {
             "type": "object",
             "required": [
@@ -121,12 +130,17 @@
     "vscode:prepublish": "npm run package",
     "compile": "webpack",
     "watch": "webpack --watch",
-    "package": "webpack --mode production --devtool hidden-source-map",
+    "package": "webpack --mode production --no-devtool",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
-    "lint": "eslint src",
-    "test": "vscode-test"
+    "lint": "eslint src webview",
+    "test": "node ./out/test/runTest.js",
+    "vsix": "vsce package --no-dependencies"
+  },
+  "overrides": {
+    "diff": "8.0.3",
+    "serialize-javascript": "7.0.7"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
@@ -134,16 +148,13 @@
     "@types/vscode": "^1.96.0",
     "@typescript-eslint/eslint-plugin": "^8.17.0",
     "@typescript-eslint/parser": "^8.17.0",
-    "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
     "eslint": "^9.16.0",
+    "mocha": "^11.8.0",
+    "ovsx": "^0.10.9",
     "ts-loader": "^9.5.1",
     "typescript": "^5.7.2",
     "webpack": "^5.95.0",
     "webpack-cli": "^5.1.4"
-  },
-  "dependencies": {
-    "ovsx": "^0.10.9",
-    "test": "^3.3.0"
   }
 }

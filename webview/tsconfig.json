@@ -7,12 +7,16 @@
 			"DOM"
 		],
 		"sourceMap": true,
-		"rootDir": ".",
+		"rootDir": "..",
 		"outDir": "../dist",
 		"strict": true,
 		"moduleResolution": "bundler"
 	},
 	"include": [
-		"./**/*.ts"
+		"./**/*.ts",
+		"../src/utils/keyLookup.ts",
+		"../src/utils/usage.ts",
+		"../src/utils/textSearch.ts",
+		"../src/utils/viewRendering.ts"
 	]
 }
