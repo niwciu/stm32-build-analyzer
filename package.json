@@ -139,7 +139,11 @@
     "vsix": "vsce package --no-dependencies"
   },
   "overrides": {
+    "@humanfs/node": "0.16.8",
+    "browserslist": "4.28.8",
     "diff": "8.0.3",
+    "fast-uri": "3.1.7",
+    "qs": "6.16.0",
     "serialize-javascript": "7.0.7"
   },
   "devDependencies": {
