@@ -200,7 +200,7 @@ suite('manual build pair settings', () => {
       const resolver = new BuildFolderResolver();
       const resolved = await (resolver as any).resolveManualPairs(root, [{
         label: 'Variable paths',
-        folder: `\${env:${variableName}}/variable-output`,
+        folder: path.join(`\${env:${variableName}}`, 'variable-output'),
         map: 'firmware.map',
         elf: 'firmware.out',
       }]);
