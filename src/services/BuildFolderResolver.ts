@@ -15,6 +15,7 @@ import {
   BuildOutputPaths,
   findPreferredBuildOutput,
 } from '../utils/buildPairs';
+import { ManualBuildPair } from '../utils/manualBuildPairs';
 
 export interface BuildPaths {
   map: string;
@@ -22,18 +23,21 @@ export interface BuildPaths {
   toolchainPath?: string;
 }
 
-interface ManualBuildPair {
-  folder: string;
-  map: string;
-  elf: string;
-  label?: string;
-}
-
 interface ResolvedBuildPair {
   folder: string;
   map: string;
   elf: string;
   label: string;
+}
+
+interface UnavailableManualBuildPair {
+  entryName: string;
+  missingPaths: string[];
+}
+
+interface ManualBuildPairResolution {
+  available: ResolvedBuildPair[];
+  unavailable: UnavailableManualBuildPair[];
 }
 
 type BuildSelection =
@@ -123,16 +127,24 @@ export class BuildFolderResolver {
       );
     }
 
-    const resolvedManualPairs = await this.resolveManualPairs(root, manualPairs);
+    const manualPairResolution = await this.resolveManualPairs(root, manualPairs);
     const autoPairs = await this.findBuildPairs(
       this.workspaceRoots.map(folder => folder.path),
       signal
     );
-    const selections = this.buildSelections(resolvedManualPairs, autoPairs);
+    const selections = this.buildSelections(manualPairResolution.available, autoPairs);
     if (selections.length === 0) {
+      const manualPairDetails = manualPairResolution.unavailable.length > 0
+        ? ' Configured manual pairs are currently unavailable: '
+          + manualPairResolution.unavailable
+            .map(issue => `"${issue.entryName}" (${issue.missingPaths.join('; ')})`)
+            .join(', ')
+          + '.'
+        : '';
       throw new Error(
         'No matching .map/.elf build outputs found. Automatic discovery requires '
         + 'the same basename; configure a manual pair when output names differ.'
+        + manualPairDetails
       );
     }
 
@@ -247,8 +259,12 @@ export class BuildFolderResolver {
     return found;
   }
 
-  private async resolveManualPairs(root: string, pairs: ManualBuildPair[]): Promise<ResolvedBuildPair[]> {
-    const resolved: ResolvedBuildPair[] = [];
+  private async resolveManualPairs(
+    root: string,
+    pairs: ManualBuildPair[]
+  ): Promise<ManualBuildPairResolution> {
+    const available: ResolvedBuildPair[] = [];
+    const unavailable: UnavailableManualBuildPair[] = [];
 
     for (const [index, pair] of pairs.entries()) {
       const entryName = pair.label || `#${index + 1}`;
@@ -281,17 +297,27 @@ export class BuildFolderResolver {
         ? resolvedElf
         : path.join(folderPath, resolvedElf);
 
-      const mapOk = await this.exists(mapPath);
-      const elfOk = await this.exists(elfPath);
+      const [mapOk, elfOk] = await Promise.all([
+        this.exists(mapPath),
+        this.exists(elfPath),
+      ]);
 
       if (!mapOk || !elfOk) {
-        throw new Error(
-          `STM32 Build Analyzer: manualBuildPairs entry "${entryName}" is not accessible: `
-          + `${!mapOk ? mapPath : ''}${!mapOk && !elfOk ? '; ' : ''}${!elfOk ? elfPath : ''}`
-        );
+        const missingPaths = [
+          !mapOk ? mapPath : undefined,
+          !elfOk ? elfPath : undefined,
+        ].filter((value): value is string => Boolean(value));
+        unavailable.push({ entryName, missingPaths });
+        if (this.debug) {
+          console.warn(
+            `[STM32] Manual pair "${entryName}" is not currently available: `
+            + missingPaths.join('; ')
+          );
+        }
+        continue;
       }
 
-      resolved.push({
+      available.push({
         folder: folderPath,
         map: mapPath,
         elf: elfPath,
@@ -299,7 +325,7 @@ export class BuildFolderResolver {
       });
     }
 
-    return resolved;
+    return { available, unavailable };
   }
 
   private resolveVariables(value: string): string {

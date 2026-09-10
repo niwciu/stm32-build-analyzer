@@ -1,4 +1,14 @@
 # Changelog
+## [1.1.8] – 2026-09-04
+
+### Fixed
+- Restore partial manual-build workflows by skipping configured pairs whose output files have not been built yet, while keeping available manual and automatically discovered outputs selectable (#14).
+- Preserve actionable diagnostics when no build output is available by listing the configured manual pairs and files that could not be accessed.
+- Keep strict validation for structurally incomplete manual entries and unresolved path variables.
+
+### Changed
+- Patch vulnerable transitive development dependencies used by linting, bundling, and publishing; the extension has no runtime npm dependencies.
+
 ## [1.1.7] – 2026-08-04
 
 ### Fixed
