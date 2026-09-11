@@ -470,6 +470,39 @@ suite('MapElfParser', () => {
       );
     });
 
+    test('parses objdump sections with CRLF line endings', async () => {
+      const output = [
+        'Sections:',
+        'Idx Name          Size      VMA       LMA       File off  Algn',
+        '  0 .text         00000020  08000000  08000000  00000100  2**2',
+        '                  CONTENTS, ALLOC, LOAD, READONLY, CODE',
+        '',
+      ].join('\r\n');
+      const parserWithSections = new MapElfParser('', false, async () => ({
+        pid: 1,
+        output: [],
+        stdout: Buffer.from(output),
+        stderr: Buffer.alloc(0),
+        status: 0,
+        signal: null,
+      } as any));
+      const regions = [{
+        name: 'FLASH',
+        startAddress: 0x08000000,
+        size: 0x10000,
+        used: 0,
+        sections: [],
+      }];
+
+      await (parserWithSections as any).parseSections('firmware.elf', regions);
+
+      assert.strictEqual(regions[0].used, 0x20);
+      assert.deepStrictEqual(
+        regions[0].sections.map((section: any) => section.name),
+        ['.text']
+      );
+    });
+
     test('does not count BSS or NOLOAD-style sections in Flash', async () => {
       const output = [
         'Sections:',
@@ -603,6 +636,63 @@ suite('MapElfParser', () => {
       assert.strictEqual(symbols[0].row, 27);
       assert.strictEqual(symbols[1].name, 'symbol_without_source');
       assert.strictEqual(symbols[1].path, '');
+    });
+
+    test('parses nm symbols and source locations with CRLF line endings', async () => {
+      const output = [
+        '08000000 00000010 T merge_task\tsrc/merge.c:747',
+        '08000010 00000008 T state_counter\tsrc/state.c:12',
+        '',
+      ].join('\r\n');
+      const parserWithSymbols = new MapElfParser('', false, async () => ({
+        pid: 1,
+        output: [],
+        stdout: Buffer.from(output),
+        stderr: Buffer.alloc(0),
+        status: 0,
+        signal: null,
+      } as any));
+      const regions = [{
+        name: 'FLASH',
+        startAddress: 0x08000000,
+        size: 0x10000,
+        used: 0x20,
+        sections: [{
+          name: '.text',
+          startAddress: 0x08000000,
+          loadAddress: 0x08000000,
+          size: 0x20,
+          symbols: [],
+        }],
+      }];
+      const sourceBase = path.join(os.tmpdir(), 'firmware-build');
+
+      await (parserWithSymbols as any).parseSymbols(
+        'firmware.elf',
+        regions,
+        sourceBase
+      );
+
+      const symbols = regions[0].sections[0].symbols as any[];
+      assert.deepStrictEqual(
+        symbols.map(symbol => ({
+          name: symbol.name,
+          path: symbol.path,
+          row: symbol.row,
+        })),
+        [
+          {
+            name: 'merge_task',
+            path: path.resolve(sourceBase, 'src/merge.c'),
+            row: 747,
+          },
+          {
+            name: 'state_counter',
+            path: path.resolve(sourceBase, 'src/state.c'),
+            row: 12,
+          },
+        ]
+      );
     });
 
     test('keeps absolute source paths unchanged', async () => {

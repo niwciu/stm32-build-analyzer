@@ -334,7 +334,7 @@ export class MapElfParser {
       8 * 1024 * 1024,
       signal
     );
-    const lines = stdout.split('\n');
+    const lines = stdout.split(/\r?\n/);
     const secRx = /^\s*\d+\s+(\S+)\s+([0-9a-fA-F]+)\s+([0-9a-fA-F]+)\s+([0-9a-fA-F]+)/;
     const allocRx = /\bALLOC\b/;
     const loadRx = /\bLOAD\b/;
@@ -411,7 +411,7 @@ export class MapElfParser {
       32 * 1024 * 1024,
       signal
     );
-    const lines = stdout.split('\n');
+    const lines = stdout.split(/\r?\n/);
     const symRx = /^([0-9A-Fa-f]+)(?:\s+([0-9A-Fa-f]+))?\s+\w\s+(.+)$/;
     const pathRx = /(.*):(\d+)$/;
     const unmatchedLines: string[] = [];
