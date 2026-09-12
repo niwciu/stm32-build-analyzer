@@ -1,4 +1,13 @@
 # Changelog
+## [1.1.9] – 2026-09-11
+
+### Fixed
+- Parse CRLF output from GNU Arm Embedded `nm` on Windows, restoring symbol and variable details together with their source-file locations (#15).
+- Handle CRLF output from `objdump` consistently so Windows section parsing does not depend on regex anchoring behavior.
+
+### Changed
+- Add regression coverage for CRLF `nm` and `objdump` output; the extension-host suite now contains 141 tests.
+
 ## [1.1.8] – 2026-09-04
 
 ### Fixed
