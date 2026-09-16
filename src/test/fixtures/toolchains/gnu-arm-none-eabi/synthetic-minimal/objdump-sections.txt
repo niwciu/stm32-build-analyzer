@@ -1,0 +1,8 @@
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .text         00000020  08000000  08000000  00000100  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  1 .data         00000010  20000000  08000020  00000120  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+  2 .bss          00000008  20000010  20000010  00000130  2**2
+                  ALLOC

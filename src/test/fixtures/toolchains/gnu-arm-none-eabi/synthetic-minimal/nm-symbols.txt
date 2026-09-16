@@ -1,0 +1,4 @@
+08000000 00000010 T Reset_Handler	src/startup.c:12
+08000010 00000008 T main	src/main.c:42
+20000000 00000004 D counter	src/main.c:7
+20000010 00000004 B buffer	src/main.c:8

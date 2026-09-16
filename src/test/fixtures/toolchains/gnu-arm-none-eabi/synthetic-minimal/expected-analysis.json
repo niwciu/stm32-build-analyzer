@@ -1,0 +1,80 @@
+{
+  "regions": [
+    {
+      "name": "RAM",
+      "startAddress": 536870912,
+      "size": 131072,
+      "used": 24,
+      "sections": [
+        {
+          "name": ".data",
+          "startAddress": 536870912,
+          "size": 16,
+          "loadAddress": 134217760,
+          "symbols": [
+            {
+              "name": "counter",
+              "startAddress": 536870912,
+              "size": 4,
+              "path": "src/main.c",
+              "row": 7
+            }
+          ]
+        },
+        {
+          "name": ".bss",
+          "startAddress": 536870928,
+          "size": 8,
+          "loadAddress": 536870928,
+          "symbols": [
+            {
+              "name": "buffer",
+              "startAddress": 536870928,
+              "size": 4,
+              "path": "src/main.c",
+              "row": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "FLASH",
+      "startAddress": 134217728,
+      "size": 1048576,
+      "used": 48,
+      "sections": [
+        {
+          "name": ".text",
+          "startAddress": 134217728,
+          "size": 32,
+          "loadAddress": 134217728,
+          "symbols": [
+            {
+              "name": "Reset_Handler",
+              "startAddress": 134217728,
+              "size": 16,
+              "path": "src/startup.c",
+              "row": 12
+            },
+            {
+              "name": "main",
+              "startAddress": 134217744,
+              "size": 8,
+              "path": "src/main.c",
+              "row": 42
+            }
+          ]
+        },
+        {
+          "name": ".data",
+          "startAddress": 134217760,
+          "size": 16,
+          "loadAddress": 134217760,
+          "symbols": []
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}

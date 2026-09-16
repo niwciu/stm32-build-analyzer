@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "gnu-arm-synthetic-minimal",
+  "toolchain": "gnu-arm-none-eabi",
+  "kind": "analysis",
+  "origin": {
+    "type": "synthetic",
+    "documentation": [
+      "https://sourceware.org/binutils/docs/ld/MEMORY.html",
+      "https://sourceware.org/binutils/docs/binutils/objdump.html",
+      "https://sourceware.org/binutils/docs/binutils/nm.html"
+    ],
+    "notes": "Hand-authored from GNU Binutils documentation and the existing inline parser regression data. It validates fixture loading and preserves expected parser semantics; it is not evidence of compatibility with a real GNU Arm toolchain release."
+  },
+  "inputs": {
+    "map": "firmware.map",
+    "objdumpStdout": "objdump-sections.txt",
+    "nmStdout": "nm-symbols.txt"
+  },
+  "expected": "expected-analysis.json"
+}
