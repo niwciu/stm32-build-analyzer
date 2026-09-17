@@ -1,14 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { getToolFilename } from '../process/ToolResolver';
+
+export { getToolFilename };
 
 export const ARM_TOOLCHAIN_TOOLS = [
   'arm-none-eabi-objdump',
   'arm-none-eabi-nm',
 ] as const;
-
-export function getToolFilename(tool: string, platform: NodeJS.Platform = process.platform): string {
-  return tool + (platform === 'win32' ? '.exe' : '');
-}
 
 export async function findMissingToolchainBinaries(
   toolchainPath: string,

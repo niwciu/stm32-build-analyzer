@@ -16,8 +16,11 @@
               "name": "counter",
               "startAddress": 536870912,
               "size": 4,
-              "path": "src/main.c",
-              "row": 7
+              "source": {
+                "path": "src/main.c",
+                "line": 7,
+                "column": null
+              }
             }
           ]
         },
@@ -31,8 +34,11 @@
               "name": "buffer",
               "startAddress": 536870928,
               "size": 4,
-              "path": "src/main.c",
-              "row": 8
+              "source": {
+                "path": "src/main.c",
+                "line": 8,
+                "column": null
+              }
             }
           ]
         }
@@ -54,15 +60,21 @@
               "name": "Reset_Handler",
               "startAddress": 134217728,
               "size": 16,
-              "path": "src/startup.c",
-              "row": 12
+              "source": {
+                "path": "src/startup.c",
+                "line": 12,
+                "column": null
+              }
             },
             {
               "name": "main",
               "startAddress": 134217744,
               "size": 8,
-              "path": "src/main.c",
-              "row": 42
+              "source": {
+                "path": "src/main.c",
+                "line": 42,
+                "column": null
+              }
             }
           ]
         },
