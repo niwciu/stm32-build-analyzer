@@ -1,0 +1,10 @@
+arm-none-eabi-ld
+OUTPUT_ARCH(arm)
+
+Memory Configuration
+Name             Origin             Length             Attributes
+FLASH            0x08000000         0x00100000         xr
+Linker script and memory map
+
+IAR ELF Linker for Arm V9.50.1
+                              PLACEMENT SUMMARY

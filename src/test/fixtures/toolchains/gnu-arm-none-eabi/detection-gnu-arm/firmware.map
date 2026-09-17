@@ -1,0 +1,11 @@
+arm-none-eabi-ld
+OUTPUT_ARCH(arm)
+OUTPUT_FORMAT(elf32-littlearm)
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+FLASH            0x08000000         0x00100000         xr
+RAM              0x20000000         0x00020000         xrw
+
+Linker script and memory map

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "detection-gnu-arm",
+  "toolchain": "gnu-arm-none-eabi",
+  "kind": "detection",
+  "origin": {
+    "type": "synthetic",
+    "documentation": [
+      "https://sourceware.org/binutils/docs/ld/Output-Section-Description.html",
+      "https://sourceware.org/binutils/docs/ld/MEMORY.html"
+    ],
+    "notes": "Hand-authored GNU ld MAP excerpt with explicit Arm producer and architecture markers. It validates detection only and does not represent a complete linker release output."
+  },
+  "inputs": {
+    "map": "firmware.map"
+  },
+  "expected": "expected-detection.json"
+}

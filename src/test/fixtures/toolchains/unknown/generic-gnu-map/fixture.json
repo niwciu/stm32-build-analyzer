@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "detection-unknown-generic-gnu",
+  "toolchain": "unknown",
+  "kind": "detection",
+  "origin": {
+    "type": "synthetic",
+    "documentation": [
+      "https://sourceware.org/binutils/docs/ld/MEMORY.html"
+    ],
+    "notes": "A generic GNU ld MAP structure intentionally omitting architecture and producer markers. It proves that GNU syntax alone is insufficient to guess GNU Arm."
+  },
+  "inputs": {
+    "map": "firmware.map"
+  },
+  "expected": "expected-detection.json"
+}

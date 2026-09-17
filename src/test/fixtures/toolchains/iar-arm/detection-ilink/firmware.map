@@ -1,0 +1,11 @@
+IAR ELF Linker for Arm V9.50.1
+ilinkarm --map firmware.map
+
+                              PLACEMENT SUMMARY
+                              =================
+
+"ROM":
+  place at address mem:0x08000000 { readonly section .intvec };
+
+                              MODULE SUMMARY
+                              ==============

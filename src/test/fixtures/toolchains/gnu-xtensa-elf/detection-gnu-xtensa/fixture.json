@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "detection-gnu-xtensa",
+  "toolchain": "gnu-xtensa-elf",
+  "kind": "detection",
+  "origin": {
+    "type": "synthetic",
+    "documentation": [
+      "https://sourceware.org/binutils/docs/ld/Output-Section-Description.html",
+      "https://sourceware.org/binutils/docs/ld/MEMORY.html"
+    ],
+    "notes": "Hand-authored GNU ld MAP excerpt with explicit Xtensa architecture and output-format markers. Vendor-specific Xtensa triples and format variants require future real fixtures."
+  },
+  "inputs": {
+    "map": "firmware.map"
+  },
+  "expected": "expected-detection.json"
+}

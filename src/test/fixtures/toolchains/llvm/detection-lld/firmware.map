@@ -1,0 +1,5 @@
+Linker: LLD 19.1.0
+             VMA              LMA     Size Align Out     In      Symbol
+        8000000          8000000      100     4 .text
+        8000000          8000000       20     4         main.o:(.text.main)
+        8000000          8000000       20     1                 main

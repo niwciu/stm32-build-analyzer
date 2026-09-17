@@ -1,0 +1,7 @@
+Memory Configuration
+
+Name             Origin             Length             Attributes
+ROM              0x00000000         0x00100000         xr
+RAM              0x10000000         0x00020000         xrw
+
+Linker script and memory map

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "detection-iar-ilink",
+  "toolchain": "iar-arm",
+  "kind": "detection",
+  "origin": {
+    "type": "synthetic",
+    "documentation": [
+      "https://docs.iar.com/ewarm/9.7x/en/iar-c-c---development/linking-using-ilink/linker-overview.html",
+      "https://docs.iar.com/ewrl78/5.2x/en/iar-c-c---development/linker-options/descriptions-of-linker-options/--map.html"
+    ],
+    "notes": "Hand-authored IAR ILINK map headings based on the documented placement and module summaries. It identifies the IAR Arm family but is not a complete version-specific output."
+  },
+  "inputs": {
+    "map": "firmware.map"
+  },
+  "expected": "expected-detection.json"
+}

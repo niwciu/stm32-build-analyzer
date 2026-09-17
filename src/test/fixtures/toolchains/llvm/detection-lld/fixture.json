@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "detection-llvm-lld",
+  "toolchain": "llvm",
+  "kind": "detection",
+  "origin": {
+    "type": "synthetic",
+    "documentation": [
+      "https://lld.llvm.org/",
+      "https://reviews.llvm.org/D63190"
+    ],
+    "notes": "Hand-authored excerpt of the native LLD ELF map layout. The producer line is included to distinguish LLD from GNU-compatible output; this is not a complete Clang/LLD artifact."
+  },
+  "inputs": {
+    "map": "firmware.map"
+  },
+  "expected": "expected-detection.json"
+}

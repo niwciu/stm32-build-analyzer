@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "detection-unknown-malformed",
+  "toolchain": "unknown",
+  "kind": "detection",
+  "origin": {
+    "type": "synthetic",
+    "documentation": [
+      "https://sourceware.org/binutils/docs/ld.html"
+    ],
+    "notes": "Deliberately malformed text that resembles no supported or recognized linker MAP format. It verifies safe unknown handling without executing artifacts."
+  },
+  "inputs": {
+    "map": "firmware.map"
+  },
+  "expected": "expected-detection.json"
+}

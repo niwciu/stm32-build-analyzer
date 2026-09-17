@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "detection-ambiguous-arm-iar",
+  "toolchain": "unknown",
+  "kind": "detection",
+  "origin": {
+    "type": "synthetic",
+    "documentation": [
+      "https://sourceware.org/binutils/docs/ld/MEMORY.html",
+      "https://docs.iar.com/ewrl78/5.2x/en/iar-c-c---development/linker-options/descriptions-of-linker-options/--map.html"
+    ],
+    "notes": "Intentionally concatenates strong GNU Arm and IAR markers to model mixed or stale artifacts. It is not output any real linker should produce."
+  },
+  "inputs": {
+    "map": "firmware.map"
+  },
+  "expected": "expected-detection.json"
+}

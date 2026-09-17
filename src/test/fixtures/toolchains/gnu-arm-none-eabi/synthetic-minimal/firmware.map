@@ -1,3 +1,6 @@
+arm-none-eabi-ld
+OUTPUT_ARCH(arm)
+
 Memory Configuration
 
 Name             Origin             Length             Attributes

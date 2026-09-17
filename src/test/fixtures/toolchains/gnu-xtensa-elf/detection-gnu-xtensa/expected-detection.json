@@ -1,0 +1,6 @@
+{
+  "status": "detected",
+  "toolchainId": "gnu-xtensa-elf",
+  "minimumConfidence": 0.6,
+  "requiredEvidenceSources": ["file-content"]
+}

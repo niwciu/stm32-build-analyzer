@@ -48,3 +48,15 @@ executed by tests.
 Adding a valid case directory automatically registers a parameterized
 conformance test. Parser or adapter tests may consume the same loaded paths and
 expected JSON without maintaining a separate fixture list.
+
+Detection expected files use one of these forms:
+
+```json
+{ "status": "detected", "toolchainId": "llvm", "minimumConfidence": 0.6,
+  "requiredEvidenceSources": ["file-content"] }
+{ "status": "unknown" }
+{ "status": "ambiguous", "toolchainIds": ["gnu-arm-none-eabi", "iar-arm"] }
+```
+
+Detection tests discover every `kind: "detection"` fixture, validate the
+registry outcome, and also run each positive input against competing detectors.

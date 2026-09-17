@@ -1,0 +1,4 @@
+{
+  "status": "ambiguous",
+  "toolchainIds": ["gnu-arm-none-eabi", "iar-arm"]
+}

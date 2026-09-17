@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "detection-gnu-riscv",
+  "toolchain": "gnu-riscv-none-elf",
+  "kind": "detection",
+  "origin": {
+    "type": "synthetic",
+    "documentation": [
+      "https://sourceware.org/binutils/docs/ld/Output-Section-Description.html",
+      "https://sourceware.org/binutils/docs/ld/MEMORY.html"
+    ],
+    "notes": "Hand-authored GNU ld MAP excerpt with explicit RISC-V architecture and output-format markers. It validates family recognition, not compatibility with a specific GNU RISC-V release."
+  },
+  "inputs": {
+    "map": "firmware.map"
+  },
+  "expected": "expected-detection.json"
+}

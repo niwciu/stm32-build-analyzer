@@ -1,0 +1,6 @@
+{
+  "status": "detected",
+  "toolchainId": "llvm",
+  "minimumConfidence": 0.6,
+  "requiredEvidenceSources": ["file-content"]
+}

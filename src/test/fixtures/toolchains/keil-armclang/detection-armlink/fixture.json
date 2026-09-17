@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "detection-keil-armlink",
+  "toolchain": "keil-armclang",
+  "kind": "detection",
+  "origin": {
+    "type": "synthetic",
+    "documentation": [
+      "https://developer.arm.com/documentation/dui0474/f/Bhccdacb",
+      "https://developer.arm.com/documentation/dui0803/latest"
+    ],
+    "notes": "Hand-authored armlink MAP excerpt using documented load-region and execution-region concepts. It recognizes both Arm Compiler 5/6 family output but does not claim parser support."
+  },
+  "inputs": {
+    "map": "firmware.map"
+  },
+  "expected": "expected-detection.json"
+}

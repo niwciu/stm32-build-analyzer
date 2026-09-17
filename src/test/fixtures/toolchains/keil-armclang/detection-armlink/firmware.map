@@ -1,0 +1,9 @@
+ARM Linker, 6.21
+
+Memory Map of the image
+
+  Image Entry point : 0x08000101
+
+  Load Region LR_IROM1 (Base: 0x08000000, Size: 0x00000100, Max: 0x00100000, ABSOLUTE)
+
+    Execution Region ER_IROM1 (Exec base: 0x08000000, Load base: 0x08000000, Size: 0x00000100, Max: 0x00100000, ABSOLUTE)
