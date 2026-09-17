@@ -50,3 +50,18 @@ English text.
 Environment validation supports `partial` in addition to `valid` and `invalid`.
 This lets an adapter distinguish a missing optional detail tool from a missing
 tool that prevents all analysis.
+
+## Phase 1 orchestration policy
+
+The orchestrator validates that both MAP and executable artifacts are readable,
+then runs detection, and only then looks up an adapter. The default adapter
+registry contains only `gnu-arm-none-eabi`. Recognized LLVM, Keil/Arm Compiler,
+IAR Arm, GNU RISC-V, and GNU Xtensa builds therefore return `unsupported`
+without validating or invoking GNU Arm tools.
+
+Unknown and conflicting evidence return `unknown` and `ambiguous` unchanged.
+An unsupported diagnostic names the detected family, explains that its adapter
+is not implemented, and includes remediation. Required-tool failure is
+`invalid`; missing optional tooling or adapter warnings produce `partial`.
+Cancellation is checked between every asynchronous stage and returned as a
+structured `cancelled` result.
