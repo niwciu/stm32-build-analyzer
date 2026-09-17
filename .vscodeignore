@@ -2,6 +2,7 @@
 .github/**
 .vscode-test/**
 .claude/**
+ToDo/**
 out/**
 node_modules/**
 src/**

@@ -12,9 +12,13 @@ import {
   UserCancelledError,
 } from '../utils/errors';
 import {
-  ARM_TOOLCHAIN_TOOLS,
   getToolFilename,
-} from '../utils/toolchain';
+} from '../process/ToolResolver';
+
+const GNU_ARM_TEST_TOOLS = [
+  'arm-none-eabi-objdump',
+  'arm-none-eabi-nm',
+] as const;
 
 suite('Extension', () => {
   suiteSetup(async () => {
@@ -101,7 +105,7 @@ suite('Extension', () => {
         'Memory Configuration\nFLASH 0x08000000 0x1000\nLinker script and memory map\n'
       ),
       fs.promises.writeFile(path.join(buildDirectory, 'firmware.elf'), 'ELF'),
-      ...ARM_TOOLCHAIN_TOOLS.map(tool =>
+      ...GNU_ARM_TEST_TOOLS.map(tool =>
         fs.promises.writeFile(
           path.join(toolchainDirectory, getToolFilename(tool)),
           ''

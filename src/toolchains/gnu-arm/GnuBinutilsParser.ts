@@ -5,6 +5,8 @@ import type {
   AnalyzedSymbol,
 } from '../../analysis/contracts';
 
+const LOG_PREFIX = '[GNU Binutils Parser]';
+
 export interface GnuSymbol extends Omit<AnalyzedSymbol, 'source'> {
   source?: AnalyzedSymbol['source'];
 }
@@ -141,7 +143,7 @@ export class GnuBinutilsParser {
         section.symbols.push({ name, startAddress, size, source });
         if (this.debug) {
           console.log(
-            `[STM32 Parser] Symbol ${name} in section ${section.name} `
+            `${LOG_PREFIX} Symbol ${name} in section ${section.name} `
             + `(${source?.path ?? ''}:${source?.line ?? 0})`
           );
         }
@@ -150,7 +152,7 @@ export class GnuBinutilsParser {
 
     if (this.debug && unmatchedLines.length > 0) {
       const maxUnmatched = 10;
-      console.log(`[STM32 Parser] Unmatched nm lines: ${unmatchedLines.length}`);
+      console.log(`${LOG_PREFIX} Unmatched nm lines: ${unmatchedLines.length}`);
       unmatchedLines.slice(0, maxUnmatched).forEach((line, index) => {
         console.log(`  ${index + 1}: "${line}"`);
       });
@@ -169,7 +171,7 @@ export class GnuBinutilsParser {
     region.used += size;
     if (this.debug) {
       console.log(
-        `[STM32 Parser] Section ${name} ${placement} image assigned to region ${region.name}`
+        `${LOG_PREFIX} Section ${name} ${placement} image assigned to region ${region.name}`
       );
     }
   }

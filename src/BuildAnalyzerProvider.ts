@@ -222,24 +222,24 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
       }
       return 'success';
 
-    } catch (e: any) {
-      if (e instanceof AnalysisCancelledError || controller.signal.aborted) {
+    } catch (error: unknown) {
+      if (error instanceof AnalysisCancelledError || controller.signal.aborted) {
         return 'superseded';
       }
-      if (e instanceof UserCancelledError) {
+      if (error instanceof UserCancelledError) {
         if (this.debug) {
-          console.log(`[STM32 Provider] ${e.message}`);
+          console.log(`[STM32 Provider] ${error.message}`);
         }
         return 'cancelled';
       }
-      const message = e.message || String(e);
+      const message = errorMessage(error);
       this.renderer?.showError(message);
       if (message !== this.lastRefreshError) {
         this.lastRefreshError = message;
         vscode.window.showErrorMessage(message);
       }
       if (this.debug) {
-        console.error('[STM32 Provider] Error during refresh:', e);
+        console.error('[STM32 Provider] Error during refresh:', error);
       }
       return 'failed';
     } finally {
@@ -289,4 +289,8 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
     this.lastRefreshError = undefined;
     this.watcher.watchFiles([]);
   }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

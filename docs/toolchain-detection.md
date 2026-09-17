@@ -1,9 +1,26 @@
 # Toolchain detection policy
 
 Phase 1 detection is evidence-based and read-only. Detectors inspect MAP text,
-the fixed ELF header prefix, and artifact names; they never execute a build artifact. The registry recognizes
-GNU Arm Embedded, GNU RISC-V, GNU Xtensa, LLVM LLD, Arm/Keil armlink, and IAR
-ILINK. Only GNU Arm has an analysis adapter in this phase.
+the fixed ELF header prefix, and artifact names; they never execute a build
+artifact. The registry recognizes GNU Arm Embedded, GNU RISC-V, GNU Xtensa,
+LLVM LLD, Arm/Keil armlink, and IAR ILINK. Only GNU Arm has an analysis adapter
+in this phase.
+
+## Support and result states
+
+| Detected family | Phase 1 behavior |
+| --- | --- |
+| GNU Arm Embedded (`arm-none-eabi`) | Supported; validates GNU Arm tools and analyzes memory, sections, and symbols. |
+| GNU RISC-V Embedded | Recognized; returns `unsupported` without invoking GNU Arm tools. |
+| GNU Xtensa Embedded | Recognized; returns `unsupported` without invoking GNU Arm tools. |
+| LLVM/Clang | Recognized; returns `unsupported` without invoking GNU Arm tools. |
+| Keil/Arm Compiler | Recognized; returns `unsupported` without invoking GNU Arm tools. |
+| IAR Embedded Workbench for Arm | Recognized; returns `unsupported` without invoking GNU Arm tools. |
+
+`unknown` means no detector reached the selection threshold. `ambiguous` means
+the leading candidates are within the configured ambiguity window. Missing or
+unreadable artifacts and unusable required tools return `invalid`. These states
+are displayed in the webview and do not fall through to another adapter.
 
 ## Evidence strength
 

@@ -31,6 +31,7 @@ const TOOL_TIMEOUT_MS = 30_000;
 const OBJDUMP_MAX_BUFFER = 8 * 1024 * 1024;
 const NM_MAX_BUFFER = 32 * 1024 * 1024;
 const VERSION_MAX_BUFFER = 1024 * 1024;
+const LOG_PREFIX = '[GNU Arm Adapter]';
 
 export interface GnuArmAdapterDependencies {
   readonly toolRunner?: ToolRunner;
@@ -159,13 +160,13 @@ export class GnuArmAdapter implements ToolchainAdapter {
     const context: AnalysisContext = { invocations: [], notes: [] };
 
     if (this.debug) {
-      console.log(`[STM32 Parser] Parsing map: ${mapPath}`);
-      console.log(`[STM32 Parser] Parsing elf: ${executablePath}`);
+      console.log(`${LOG_PREFIX} Parsing map: ${mapPath}`);
+      console.log(`${LOG_PREFIX} Parsing executable: ${executablePath}`);
     }
 
     const regions: GnuRegion[] = this.mapParser.parseFile(mapPath);
     if (this.debug) {
-      console.log(`[STM32 Parser] Regions parsed: ${regions.length}`);
+      console.log(`${LOG_PREFIX} Regions parsed: ${regions.length}`);
       regions.forEach(region => console.log(
         ` → ${region.name}: ${region.size.toString(16)} bytes at `
         + `0x${region.startAddress.toString(16)}`
@@ -243,10 +244,10 @@ export class GnuArmAdapter implements ToolchainAdapter {
     const resolution = this.toolResolver.resolve(tool);
     if (resolution.source === 'configured-directory') {
       if (this.debug) {
-        console.log(`[STM32 Parser] Using tool: ${resolution.command}`);
+        console.log(`${LOG_PREFIX} Using tool: ${resolution.command}`);
       }
     } else if (this.debug) {
-      console.warn(`[STM32 Parser] Falling back to ${tool} from PATH`);
+      console.warn(`${LOG_PREFIX} Falling back to ${tool} from PATH`);
     }
 
     context?.invocations.push({
@@ -308,7 +309,7 @@ export class GnuArmAdapter implements ToolchainAdapter {
       : ANALYSIS_DIAGNOSTIC_CODES.TOOL_EXECUTION_FAILED;
 
     if (this.debug) {
-      console.error(`[STM32 Parser] ${message}`);
+      console.error(`${LOG_PREFIX} ${message}`);
     }
 
     return new ToolExecutionError(
@@ -345,13 +346,13 @@ export class GnuArmAdapter implements ToolchainAdapter {
       );
       executableForTools = destination;
       if (this.debug) {
-        console.log(`[STM32 Parser] Analyzing ELF copy: ${destination}`);
+        console.log(`${LOG_PREFIX} Analyzing executable copy: ${destination}`);
       }
     } catch (error) {
       const note = `Could not create executable copy; analyzed original: ${errorMessage(error)}`;
       context.notes.push(note);
       if (this.debug) {
-        console.warn(`[STM32 Parser] ${note}`);
+        console.warn(`${LOG_PREFIX} ${note}`);
       }
       if (tempDirectory) {
         await this.removeTempDirectory(tempDirectory);
@@ -375,7 +376,7 @@ export class GnuArmAdapter implements ToolchainAdapter {
     } catch (error) {
       if (this.debug) {
         console.warn(
-          `[STM32 Parser] Failed to remove temp dir ${directory}: ${errorMessage(error)}`
+          `${LOG_PREFIX} Failed to remove temp dir ${directory}: ${errorMessage(error)}`
         );
       }
     }

@@ -1,6 +1,8 @@
 import * as fs from 'fs';
 import type { GnuRegion } from './GnuBinutilsParser';
 
+const LOG_PREFIX = '[GNU Linker MAP Parser]';
+
 export class GnuLinkerMapParser {
   constructor(private readonly debug: boolean = false) {}
 
@@ -48,7 +50,7 @@ export class GnuLinkerMapParser {
       const name = match[1];
       if (isGnuCatchAllRegion(name)) {
         if (this.debug) {
-          console.log(`[STM32 Parser] Skipping catch-all region: ${name}`);
+          console.log(`${LOG_PREFIX} Skipping catch-all region: ${name}`);
         }
         continue;
       }

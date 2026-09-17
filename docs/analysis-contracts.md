@@ -71,3 +71,10 @@ The provider maps `success` and `partial` to the existing tables. Unsupported,
 unknown, ambiguous, invalid/missing-tool, and cancelled results clear stale
 table data and display a severity-appropriate status with remediation. Only
 invalid results also produce the existing de-duplicated VS Code error message.
+
+Unexpected detector, validator, or adapter exceptions are caught at the
+orchestrator boundary and normalized into a serializable `invalid` result.
+Cancellation remains distinct and is never reported as a tool failure.
+
+See [Adding a toolchain adapter](adding-toolchain-adapter.md) for the required
+detector, adapter, fixture, registration, and verification steps.

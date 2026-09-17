@@ -361,6 +361,27 @@ suite('AnalysisOrchestrator result policy', () => {
     assert.strictEqual(result.status, 'invalid');
     assert.deepStrictEqual(result.diagnostics, [diagnostic]);
   });
+
+  test('normalizes an unexpected adapter exception into an invalid result', async () => {
+    const adapter = fakeAdapter('gnu-arm-none-eabi', {
+      analyzeError: new Error('unexpected parser failure'),
+    });
+
+    const result = await orchestratorFor(
+      detectedService('gnu-arm-none-eabi'),
+      adapter
+    ).analyze(artifacts);
+
+    assert.strictEqual(result.status, 'invalid');
+    assert.strictEqual(
+      result.diagnostics[0].code,
+      ANALYSIS_DIAGNOSTIC_CODES.TOOL_EXECUTION_FAILED
+    );
+    assert.strictEqual(
+      result.diagnostics[0].cause?.message,
+      'unexpected parser failure'
+    );
+  });
 });
 
 interface FakeAdapterOptions {
