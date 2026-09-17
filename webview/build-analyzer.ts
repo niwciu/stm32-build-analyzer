@@ -940,7 +940,10 @@ function renderTables(regions: Region[]): void {
     syncSelectionCheckboxes();
 }
 
-function showAnalysisStatus(message?: string, level: 'error' | 'warning' = 'error'): void {
+function showAnalysisStatus(
+    message?: string,
+    level: 'error' | 'warning' | 'info' = 'error'
+): void {
     const status = document.getElementById('analysisStatus');
     if (!status) {
         return;
@@ -948,6 +951,28 @@ function showAnalysisStatus(message?: string, level: 'error' | 'warning' = 'erro
     status.textContent = message ?? '';
     status.classList.toggle('is-hidden', !message);
     status.classList.toggle('is-warning', Boolean(message) && level === 'warning');
+    status.classList.toggle('is-info', Boolean(message) && level === 'info');
+}
+
+function clearAnalysisPresentation(buildFolder: string): void {
+    lastRegions = [];
+    expandedKeys.clear();
+    selectedKeys.clear();
+    selectedRowKey = null;
+    showSelectedOnly = false;
+    renderTables([]);
+    const buildFolderElement = document.getElementById('buildFolderPath');
+    if (buildFolderElement) {
+        buildFolderElement.textContent = buildFolder;
+    }
+    const selectionToggle = document.getElementById('toggleSelectionButton');
+    if (selectionToggle) {
+        selectionToggle.textContent = 'Show Selected';
+    }
+    const searchMatchCount = document.getElementById('searchMatchCount');
+    if (searchMatchCount) {
+        searchMatchCount.textContent = '';
+    }
 }
 
 // Initialize when DOM is ready
@@ -1120,28 +1145,24 @@ window.addEventListener('message', (event: MessageEvent) => {
                 }
             }
             break;
-        case 'showAnalysisError':
+        case 'showAnalysisError': {
             const failureState = createAnalysisFailureUiState(message.message);
-            lastRegions = [];
-            expandedKeys.clear();
-            selectedKeys.clear();
-            selectedRowKey = null;
-            showSelectedOnly = false;
-            renderTables([]);
+            clearAnalysisPresentation(failureState.buildFolder);
             showAnalysisStatus(failureState.status);
-            const failedBuildFolder = document.getElementById('buildFolderPath');
-            if (failedBuildFolder) {
-                failedBuildFolder.textContent = failureState.buildFolder;
-            }
-            const selectionToggle = document.getElementById('toggleSelectionButton');
-            if (selectionToggle) {
-                selectionToggle.textContent = failureState.selectionToggle;
-            }
-            const failedSearchMatchCount = document.getElementById('searchMatchCount');
-            if (failedSearchMatchCount) {
-                failedSearchMatchCount.textContent = failureState.searchMatchCount;
-            }
             break;
+        }
+        case 'showAnalysisStatus': {
+            clearAnalysisPresentation(
+                message.currentBuildFolderRelativePath || 'Analysis unavailable'
+            );
+            const statusText = [message.title, message.message]
+                .filter((value: unknown): value is string =>
+                    typeof value === 'string' && value.length > 0
+                )
+                .join('\n');
+            showAnalysisStatus(statusText, message.level || 'error');
+            break;
+        }
         case 'restoreScroll':
             const scrollContainer = document.getElementById('scroll-container') as HTMLElement;
             scrollContainer.scrollTo(0, message.scrollTop);

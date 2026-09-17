@@ -2,15 +2,16 @@
 
 The contracts under `src/analysis` are the stable boundary between artifact
 discovery, toolchain detection, adapters, orchestration, and presentation. They
-do not replace the current GNU Arm execution path until later migration steps.
+now drive the provider's analysis path; the presentation mapper retains the
+existing webview's region, section, symbol, and source-link model.
 
 ## Artifact and detection semantics
 
 `BuildArtifactSet` permits absent paths so an incomplete selection can produce
 an `invalid` result with diagnostics. Detectors return `null` when they have no
 evidence. A returned detection carries its evidence and a confidence normalized
-to the inclusive range 0 through 1; ranking and range enforcement belong to the
-future detection registry.
+to the inclusive range 0 through 1. The detection registry applies deterministic
+ranking, selection threshold, and ambiguity rules.
 
 Toolchain IDs distinguish all initially recognized families. `unknown` is a
 detection outcome and cannot be used as an adapter or successful-analysis
@@ -65,3 +66,8 @@ is not implemented, and includes remediation. Required-tool failure is
 `invalid`; missing optional tooling or adapter warnings produce `partial`.
 Cancellation is checked between every asynchronous stage and returned as a
 structured `cancelled` result.
+
+The provider maps `success` and `partial` to the existing tables. Unsupported,
+unknown, ambiguous, invalid/missing-tool, and cancelled results clear stale
+table data and display a severity-appropriate status with remediation. Only
+invalid results also produce the existing de-duplicated VS Code error message.

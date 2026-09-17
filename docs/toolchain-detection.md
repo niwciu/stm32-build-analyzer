@@ -1,15 +1,18 @@
 # Toolchain detection policy
 
-Phase 1 detection is evidence-based and read-only. Detectors inspect MAP text
-and artifact names; they never execute a build artifact. The registry recognizes
+Phase 1 detection is evidence-based and read-only. Detectors inspect MAP text,
+the fixed ELF header prefix, and artifact names; they never execute a build artifact. The registry recognizes
 GNU Arm Embedded, GNU RISC-V, GNU Xtensa, LLVM LLD, Arm/Keil armlink, and IAR
 ILINK. Only GNU Arm has an analysis adapter in this phase.
 
 ## Evidence strength
 
 MAP producer strings, target architecture declarations, output-format markers,
-and format-specific headings carry the decisive weights. Configured tool names,
-available inspection tools, and filenames are supporting evidence only. Even a
+format-specific headings, and ELF machine architecture carry the strongest
+weights. ELF architecture complements linker-family evidence: an Arm ELF alone
+does not prove GNU Arm, while a generic GNU MAP plus `EM_ARM` is sufficient for
+backward-compatible detection. Configured tool names, available inspection tools,
+and filenames are supporting evidence only. Even a
 matching configured and available tool remains below the default selection
 threshold when no artifact-content evidence exists.
 
@@ -27,12 +30,13 @@ evidence for future UI diagnostics.
 
 ## Current limitations
 
-- Phase 1 uses MAP content and does not yet parse ELF producer comments,
-  attributes, or machine metadata.
+- Phase 1 reads ELF class, byte order, and machine metadata only. It does not
+  yet parse ELF producer comments or target-specific attributes.
 - The fixtures are minimal, synthetic excerpts derived from GNU Binutils, LLVM
   LLD, Arm linker, and IAR linker documentation. Their manifests record exact
   documentation references and case-specific limitations.
 - Vendor-specific GNU Xtensa triples and older/newer proprietary MAP layouts
   need legally redistributable real fixtures before support can be claimed.
-- A generic GNU linker MAP without an architecture or producer marker is
-  intentionally unknown. Mixed strong markers are intentionally ambiguous.
+- A generic GNU linker MAP without architecture evidence from either the MAP or
+  ELF header is intentionally unknown. Mixed strong markers are intentionally
+  ambiguous.

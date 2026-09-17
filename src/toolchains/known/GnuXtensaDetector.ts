@@ -30,6 +30,11 @@ export class GnuXtensaDetector extends EvidenceBasedDetector {
           weight: 0.25,
         },
       ],
+      elfMachineRules: [{
+        machines: [94],
+        description: 'ELF machine architecture is Xtensa (EM_XTENSA).',
+        weight: 0.4,
+      }],
       fileNameRules: [{
         pattern: /(?:^|[-_.])xtensa(?:[-_.]|$)/i,
         description: 'Artifact filename contains an Xtensa target hint.',

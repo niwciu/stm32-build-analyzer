@@ -30,6 +30,11 @@ export class GnuArmDetector extends EvidenceBasedDetector {
           weight: 0.35,
         },
       ],
+      elfMachineRules: [{
+        machines: [40],
+        description: 'ELF machine architecture is Arm (EM_ARM).',
+        weight: 0.35,
+      }],
       fileNameRules: [{
         pattern: /(?:^|[-_.])arm(?:[-_.]|$)/i,
         description: 'Artifact filename contains an Arm target hint.',

@@ -3,7 +3,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { BuildAnalyzerProvider } from '../BuildAnalyzerProvider';
-import { MapElfParser } from '../services/MapElfParser';
+import type {
+  BuildAnalysisResult,
+  ToolchainDetection,
+} from '../analysis/contracts';
 import {
   AnalysisCancelledError,
   UserCancelledError,
@@ -39,11 +42,11 @@ suite('Extension', () => {
     const context = { subscriptions } as unknown as vscode.ExtensionContext;
     const toolchainPaths: string[] = [];
     let buildPathResolutions = 0;
-    const parserFactory = (toolchainPath: string): MapElfParser => {
+    const analysisServiceFactory = (toolchainPath: string) => {
       toolchainPaths.push(toolchainPath);
-      return { parse: () => [] } as unknown as MapElfParser;
+      return { analyze: async () => successResult() };
     };
-    const provider = new BuildAnalyzerProvider(context, parserFactory);
+    const provider = new BuildAnalyzerProvider(context, analysisServiceFactory);
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
     let resolvedToolchainPath: string | undefined = `${root}/resolved-toolchain`;
 
@@ -59,7 +62,7 @@ suite('Extension', () => {
       resolveToolchainPath: async () => resolvedToolchainPath,
     };
     (provider as any).renderer = {
-      showData: () => undefined,
+      showAnalysis: () => undefined,
       showError: () => undefined,
     };
 
@@ -138,18 +141,17 @@ suite('Extension', () => {
       (toolchainPath: string) => {
         toolchainPaths.push(toolchainPath);
         return {
-          warnings: [],
-          parse: async () => [],
-        } as unknown as MapElfParser;
+          analyze: async () => successResult(),
+        };
       }
     );
     (provider as any).renderer = {
-      showData: () => undefined,
+      showAnalysis: () => undefined,
       showError: () => undefined,
     };
     let addedWorkspaceFolder = false;
 
-    const waitForParserCalls = async (expected: number): Promise<void> => {
+    const waitForAnalysisCalls = async (expected: number): Promise<void> => {
       const deadline = Date.now() + 3000;
       while (toolchainPaths.length < expected && Date.now() < deadline) {
         await new Promise(resolve => setTimeout(resolve, 20));
@@ -169,7 +171,7 @@ suite('Extension', () => {
         '',
         vscode.ConfigurationTarget.Workspace
       );
-      await waitForParserCalls(2);
+      await waitForAnalysisCalls(2);
       assert.strictEqual(toolchainPaths[1], '');
 
       const folderCount = vscode.workspace.workspaceFolders?.length ?? 0;
@@ -179,7 +181,7 @@ suite('Extension', () => {
         { uri: vscode.Uri.file(additionalRoot), name: 'Additional' }
       );
       assert.ok(addedWorkspaceFolder, 'Additional fixture folder was not added');
-      await waitForParserCalls(3);
+      await waitForAnalysisCalls(3);
       assert.strictEqual(toolchainPaths[2], '');
     } finally {
       provider.dispose();
@@ -207,10 +209,10 @@ suite('Extension', () => {
     const provider = new BuildAnalyzerProvider(
       context,
       () => ({
-        parse: () => {
+        analyze: async () => {
           throw new Error('objdump failed for test');
         },
-      } as unknown as MapElfParser)
+      })
     );
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
     let shownData = false;
@@ -224,7 +226,7 @@ suite('Extension', () => {
       resolveToolchainPath: async () => undefined,
     };
     (provider as any).renderer = {
-      showData: () => { shownData = true; },
+      showAnalysis: () => { shownData = true; },
       showError: (message: string) => { shownError = message; },
     };
 
@@ -233,6 +235,43 @@ suite('Extension', () => {
 
       assert.strictEqual(shownData, false);
       assert.strictEqual(shownError, 'objdump failed for test');
+    } finally {
+      provider.dispose();
+      subscriptions.forEach(disposable => disposable.dispose());
+    }
+  });
+
+  test('provider renders an unsupported toolchain without throwing', async () => {
+    const subscriptions: vscode.Disposable[] = [];
+    const context = { subscriptions } as unknown as vscode.ExtensionContext;
+    const provider = new BuildAnalyzerProvider(
+      context,
+      () => ({ analyze: async () => unsupportedResult('llvm') })
+    );
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+    let shownStatus: string | undefined;
+    let shownError: string | undefined;
+
+    (provider as any).resolver = {
+      resolve: async () => ({
+        map: `${root}/build/firmware.map`,
+        elf: `${root}/build/firmware.elf`,
+      }),
+      resolveToolchainPath: async () => undefined,
+    };
+    (provider as any).renderer = {
+      showAnalysis: (viewModel: { status: string }) => {
+        shownStatus = viewModel.status;
+      },
+      showError: (message: string) => { shownError = message; },
+    };
+
+    try {
+      const outcome = await provider.refresh();
+
+      assert.strictEqual(outcome, 'success');
+      assert.strictEqual(shownStatus, 'unsupported');
+      assert.strictEqual(shownError, undefined);
     } finally {
       provider.dispose();
       subscriptions.forEach(disposable => disposable.dispose());
@@ -257,7 +296,7 @@ suite('Extension', () => {
       },
     };
     (provider as any).renderer = {
-      showData: () => undefined,
+      showAnalysis: () => undefined,
       showError: (message: string) => { shownError = message; },
     };
 
@@ -272,23 +311,21 @@ suite('Extension', () => {
     }
   });
 
-  test('a newer refresh cancels an older parser run silently', async () => {
+  test('a newer refresh cancels an older analysis run silently', async () => {
     const subscriptions: vscode.Disposable[] = [];
     const context = { subscriptions } as unknown as vscode.ExtensionContext;
-    let parserCalls = 0;
+    let analysisCalls = 0;
     let shownData = 0;
     let shownError = 0;
     const provider = new BuildAnalyzerProvider(
       context,
       () => ({
-        warnings: [],
-        parse: async (
-          _map: string,
-          _elf: string,
+        analyze: async (
+          _artifacts: unknown,
           signal?: AbortSignal
         ) => {
-          parserCalls++;
-          if (parserCalls === 1) {
+          analysisCalls++;
+          if (analysisCalls === 1) {
             await new Promise<void>((_resolve, reject) => {
               signal?.addEventListener(
                 'abort',
@@ -297,9 +334,9 @@ suite('Extension', () => {
               );
             });
           }
-          return [];
+          return successResult();
         },
-      } as unknown as MapElfParser)
+      })
     );
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
 
@@ -311,7 +348,7 @@ suite('Extension', () => {
       resolveToolchainPath: async () => undefined,
     };
     (provider as any).renderer = {
-      showData: () => { shownData++; },
+      showAnalysis: () => { shownData++; },
       showError: () => { shownError++; },
     };
 
@@ -330,28 +367,32 @@ suite('Extension', () => {
     }
   });
 
-  test('a superseded refresh cannot publish an outdated toolchain warning', async () => {
+  test('a superseded refresh cannot publish an outdated analysis result', async () => {
     const subscriptions: vscode.Disposable[] = [];
     const context = { subscriptions } as unknown as vscode.ExtensionContext;
-    let completeMissingBinaryCheck: ((missing: string[]) => void) | undefined;
-    let markMissingBinaryCheckStarted: (() => void) | undefined;
-    const missingBinaryCheckStarted = new Promise<void>(resolve => {
-      markMissingBinaryCheckStarted = resolve;
+    let completeFirstAnalysis: ((result: BuildAnalysisResult) => void) | undefined;
+    let markFirstAnalysisStarted: (() => void) | undefined;
+    const firstAnalysisStarted = new Promise<void>(resolve => {
+      markFirstAnalysisStarted = resolve;
     });
+    let analysisCalls = 0;
     const provider = new BuildAnalyzerProvider(
       context,
       () => ({
-        warnings: [],
-        parse: async () => [],
-      } as unknown as MapElfParser),
-      async () => {
-        markMissingBinaryCheckStarted?.();
-        return new Promise<string[]>(resolve => {
-          completeMissingBinaryCheck = resolve;
-        });
-      }
+        analyze: async () => {
+          analysisCalls++;
+          if (analysisCalls === 1) {
+            markFirstAnalysisStarted?.();
+            return new Promise<BuildAnalysisResult>(resolve => {
+              completeFirstAnalysis = resolve;
+            });
+          }
+          return successResult();
+        },
+      })
     );
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+    const shownStatuses: string[] = [];
 
     (provider as any).resolver = {
       resolve: async () => ({
@@ -362,23 +403,77 @@ suite('Extension', () => {
       resolveToolchainPath: async () => undefined,
     };
     (provider as any).renderer = {
-      showData: () => undefined,
+      showAnalysis: (viewModel: { status: string }) => {
+        shownStatuses.push(viewModel.status);
+      },
       showError: () => undefined,
     };
 
     try {
       const first = provider.refresh();
-      await missingBinaryCheckStarted;
+      await firstAnalysisStarted;
       const second = provider.refresh();
-      completeMissingBinaryCheck?.(['arm-none-eabi-objdump']);
+      completeFirstAnalysis?.(unsupportedResult('llvm'));
 
       const outcomes = await Promise.all([first, second]);
 
       assert.deepStrictEqual(outcomes, ['superseded', 'success']);
-      assert.strictEqual((provider as any).lastMissingToolWarning, undefined);
+      assert.deepStrictEqual(shownStatuses, ['success']);
     } finally {
       provider.dispose();
       subscriptions.forEach(disposable => disposable.dispose());
     }
   });
 });
+
+const gnuDetection: ToolchainDetection = {
+  toolchainId: 'gnu-arm-none-eabi',
+  confidence: 1,
+  evidence: [{
+    source: 'file-content',
+    description: 'test GNU Arm marker',
+    weight: 1,
+  }],
+  diagnostics: [],
+};
+
+function successResult(): BuildAnalysisResult {
+  return {
+    status: 'success',
+    detection: gnuDetection,
+    analysis: {
+      regions: [],
+      toolchain: {
+        id: 'gnu-arm-none-eabi',
+        displayName: 'GNU Arm Embedded',
+      },
+      provenance: {
+        adapterId: 'gnu-arm-none-eabi',
+        artifacts: { linkerScriptPaths: [] },
+        toolInvocations: [],
+        notes: [],
+      },
+      warnings: [],
+    },
+    diagnostics: [],
+  };
+}
+
+function unsupportedResult(
+  toolchainId: 'llvm'
+): BuildAnalysisResult {
+  return {
+    status: 'unsupported',
+    detection: {
+      toolchainId,
+      confidence: 1,
+      evidence: [{
+        source: 'file-content',
+        description: 'test unsupported marker',
+        weight: 1,
+      }],
+      diagnostics: [],
+    },
+    diagnostics: [],
+  };
+}

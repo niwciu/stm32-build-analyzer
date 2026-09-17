@@ -30,6 +30,11 @@ export class GnuRiscVDetector extends EvidenceBasedDetector {
           weight: 0.25,
         },
       ],
+      elfMachineRules: [{
+        machines: [243],
+        description: 'ELF machine architecture is RISC-V (EM_RISCV).',
+        weight: 0.4,
+      }],
       fileNameRules: [{
         pattern: /(?:^|[-_.])riscv(?:32|64)?(?:[-_.]|$)/i,
         description: 'Artifact filename contains a RISC-V target hint.',

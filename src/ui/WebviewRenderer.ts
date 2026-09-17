@@ -2,6 +2,10 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Region } from '../models';
+import type {
+  AnalysisStatusViewModel,
+  AnalysisViewModel,
+} from '../presentation/analysisViewModel';
 import { createNonce } from '../utils/nonce';
 
 export class WebviewRenderer {
@@ -61,6 +65,32 @@ export class WebviewRenderer {
       data: regions,
       currentBuildFolderRelativePath: buildFolder,
       warnings,
+    });
+  }
+
+  public showAnalysis(
+    viewModel: AnalysisViewModel,
+    buildFolder: string
+  ): void {
+    if (viewModel.kind === 'data') {
+      this.showData(viewModel.regions, buildFolder, viewModel.warnings);
+      return;
+    }
+
+    this.showStatus(viewModel, buildFolder);
+  }
+
+  public showStatus(
+    status: AnalysisStatusViewModel,
+    buildFolder: string
+  ): void {
+    this.view.webview.postMessage({
+      command: 'showAnalysisStatus',
+      status: status.status,
+      title: status.title,
+      message: status.message,
+      level: status.level,
+      currentBuildFolderRelativePath: buildFolder,
     });
   }
 

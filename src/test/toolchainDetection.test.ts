@@ -7,6 +7,7 @@ import {
   ArtifactInspectionError,
   FileArtifactInspector,
 } from '../artifacts/ArtifactInspector';
+import { parseElfMetadata } from '../artifacts/ElfMetadata';
 import {
   createDefaultDetectionRegistry,
   createDefaultDetectors,
@@ -117,6 +118,49 @@ suite('toolchain detection fixtures', () => {
 });
 
 suite('detection evidence policy', () => {
+  test('combines a generic GNU MAP with EM_ARM ELF metadata', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'gnu-arm-detection-'));
+    const mapPath = path.join(directory, 'firmware.map');
+    const executablePath = path.join(directory, 'firmware.elf');
+    fs.writeFileSync(
+      mapPath,
+      'Memory Configuration\nFLASH 0x08000000 0x1000\nLinker script and memory map\n',
+      'utf8'
+    );
+    fs.writeFileSync(executablePath, elfHeader(40));
+
+    try {
+      const report = await createDefaultDetectionRegistry().detect({
+        mapPath,
+        executablePath,
+        linkerScriptPaths: [],
+      });
+      assert.strictEqual(report.status, 'detected');
+      assert.strictEqual(report.detection.toolchainId, 'gnu-arm-none-eabi');
+      assert.ok(report.detection.evidence.some(evidence =>
+        evidence.source === 'elf-metadata'
+      ));
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  test('does not select GNU Arm from EM_ARM metadata alone', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'gnu-arm-detection-'));
+    const executablePath = path.join(directory, 'firmware.elf');
+    fs.writeFileSync(executablePath, elfHeader(40));
+
+    try {
+      const report = await createDefaultDetectionRegistry().detect({
+        executablePath,
+        linkerScriptPaths: [],
+      });
+      assert.strictEqual(report.status, 'unknown');
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   test('configured and available tools cannot decide a toolchain alone', async () => {
     const toolAvailability: ToolAvailabilityProbe = {
       isAvailable: async () => true,
@@ -273,6 +317,35 @@ suite('file artifact inspector', () => {
       }
     );
   });
+
+  test('reads only the requested binary prefix', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'artifact-inspector-'));
+    const artifactPath = path.join(directory, 'firmware.elf');
+    fs.writeFileSync(artifactPath, Buffer.alloc(128, 0xaa));
+
+    try {
+      const content = await new FileArtifactInspector().readBytes(artifactPath, 20);
+      assert.strictEqual(content.length, 20);
+      assert.ok(content.every(byte => byte === 0xaa));
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  });
+});
+
+suite('ELF metadata parsing', () => {
+  test('parses little-endian 32-bit machine metadata', () => {
+    assert.deepStrictEqual(parseElfMetadata(elfHeader(40)), {
+      machine: 40,
+      bitness: 32,
+      littleEndian: true,
+    });
+  });
+
+  test('rejects non-ELF and incomplete headers', () => {
+    assert.strictEqual(parseElfMetadata(Buffer.from('not elf')), null);
+    assert.strictEqual(parseElfMetadata(Buffer.alloc(19)), null);
+  });
 });
 
 function artifactsFor(fixture: ToolchainFixture): BuildArtifactSet {
@@ -306,4 +379,11 @@ function fixedDetector(
     toolchainId,
     detect: async () => detection,
   };
+}
+
+function elfHeader(machine: number): Buffer {
+  const header = Buffer.alloc(64);
+  header.set([0x7f, 0x45, 0x4c, 0x46, 1, 1]);
+  header.writeUInt16LE(machine, 18);
+  return header;
 }

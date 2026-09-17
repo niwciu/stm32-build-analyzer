@@ -1,18 +1,31 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import {
+  createDefaultAnalysisOrchestrator,
+} from './analysis/AnalysisOrchestrator';
+import type { BuildAnalysisResult } from './analysis/contracts';
+import type { BuildArtifactSet } from './artifacts/BuildArtifactSet';
 import { FileWatcherService } from './services/FileWatcherService';
 import { BuildFolderResolver, BuildPaths } from './services/BuildFolderResolver';
-import { MapElfParser } from './services/MapElfParser';
+import { toAnalysisViewModel } from './presentation/analysisViewModel';
 import { WebviewRenderer } from './ui/WebviewRenderer';
-import { findMissingToolchainBinaries } from './utils/toolchain';
 import { assertWorkspaceTrusted } from './utils/workspaceTrust';
 import {
   AnalysisCancelledError,
   UserCancelledError,
 } from './utils/errors';
 
-export type MapElfParserFactory = (toolchainPath: string, debug: boolean) => MapElfParser;
-export type MissingToolchainBinariesFinder = (toolchainPath: string) => Promise<string[]>;
+export interface AnalysisService {
+  analyze(
+    artifacts: BuildArtifactSet,
+    signal?: AbortSignal
+  ): Promise<BuildAnalysisResult>;
+}
+
+export type AnalysisServiceFactory = (
+  toolchainPath: string,
+  debug: boolean
+) => AnalysisService;
 type RefreshOutcome = 'success' | 'cancelled' | 'superseded' | 'failed';
 
 export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
@@ -21,7 +34,6 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
   private renderer?: WebviewRenderer;
   private paths?: BuildPaths;
   private pathConfigurationGeneration = 0;
-  private lastMissingToolWarning?: string;
   private lastRefreshError?: string;
   private activeRefresh?: AbortController;
   private refreshGeneration = 0;
@@ -32,10 +44,16 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
 
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly parserFactory: MapElfParserFactory =
-      (toolchainPath, debug) => new MapElfParser(toolchainPath, debug),
-    private readonly missingToolchainBinariesFinder: MissingToolchainBinariesFinder =
-      findMissingToolchainBinaries
+    private readonly analysisServiceFactory: AnalysisServiceFactory =
+      (toolchainPath, debug) => createDefaultAnalysisOrchestrator({
+        toolchainPath,
+        debug,
+        detectionOptions: {
+          debugLogger: debug
+            ? message => console.log(message)
+            : undefined,
+        },
+      })
   ) {
     this.watcher  = new FileWatcherService(() => this.refresh());
     this.resolver = new BuildFolderResolver();
@@ -51,7 +69,6 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
       if (buildPathsChanged) {
         this.invalidatePaths();
       } else {
-        this.lastMissingToolWarning = undefined;
         this.lastRefreshError = undefined;
       }
       if (this.renderer) {
@@ -104,7 +121,7 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  /** Fast refresh – parses using cached paths */
+  /** Fast refresh – analyzes using cached paths. */
   public async refresh(): Promise<RefreshOutcome> {
     const refreshGeneration = ++this.refreshGeneration;
     this.activeRefresh?.abort();
@@ -145,30 +162,6 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         throw new Error('Missing required build paths.');
       }
 
-      await this.warnAboutMissingToolchainBinaries(
-        paths.toolchainPath,
-        () =>
-          !controller.signal.aborted
-          && refreshGeneration === this.refreshGeneration
-          && generation === this.pathConfigurationGeneration
-      );
-      if (
-        controller.signal.aborted
-        || refreshGeneration !== this.refreshGeneration
-        || generation !== this.pathConfigurationGeneration
-      ) {
-        return 'superseded';
-      }
-
-      const parser = this.parserFactory(paths.toolchainPath ?? '', this.debug);
-      const regions = await parser.parse(paths.map, paths.elf, controller.signal);
-      if (controller.signal.aborted || refreshGeneration !== this.refreshGeneration) {
-        return 'superseded';
-      }
-      if (generation !== this.pathConfigurationGeneration) {
-        return 'superseded';
-      }
-
       const root = vscode.workspace
         .getWorkspaceFolder(vscode.Uri.file(paths.map))
         ?.uri.fsPath
@@ -178,12 +171,54 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
       }
 
       const rel = path.relative(root, paths.map);
+      const buildFolder = path.dirname(rel);
+      const analysisService = this.analysisServiceFactory(
+        paths.toolchainPath ?? '',
+        this.debug
+      );
+      const result = await analysisService.analyze({
+        mapPath: paths.map,
+        executablePath: paths.elf,
+        linkerScriptPaths: [],
+        workspaceFolder: root,
+      }, controller.signal);
+      if (
+        controller.signal.aborted
+        || refreshGeneration !== this.refreshGeneration
+        || generation !== this.pathConfigurationGeneration
+      ) {
+        return 'superseded';
+      }
 
-      this.renderer?.showData(regions, path.dirname(rel), parser.warnings);
+      const viewModel = toAnalysisViewModel(result);
+      this.renderer?.showAnalysis(viewModel, buildFolder);
+
+      if (result.status === 'cancelled') {
+        this.lastRefreshError = undefined;
+        return 'cancelled';
+      }
+      if (result.status === 'invalid') {
+        if (viewModel.kind !== 'status') {
+          throw new Error('Invalid analysis result mapped to a data view.');
+        }
+        const message = `${viewModel.title}: ${viewModel.message}`;
+        if (message !== this.lastRefreshError) {
+          this.lastRefreshError = message;
+          vscode.window.showErrorMessage(message);
+        }
+        return 'failed';
+      }
+
       this.lastRefreshError = undefined;
 
       if (this.debug) {
-        console.log(`[STM32 Provider] Parsed ${regions.length} region(s)`);
+        const regionCount = viewModel.kind === 'data'
+          ? viewModel.regions.length
+          : 0;
+        console.log(
+          `[STM32 Provider] Analysis status ${result.status}; `
+          + `${regionCount} region(s)`
+        );
       }
       return 'success';
 
@@ -251,36 +286,7 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
     this.preferredBuildPaths = preferredPaths
       ? { map: preferredPaths.map, elf: preferredPaths.elf }
       : undefined;
-    this.lastMissingToolWarning = undefined;
     this.lastRefreshError = undefined;
     this.watcher.watchFiles([]);
-  }
-
-  private async warnAboutMissingToolchainBinaries(
-    toolchainPath: string | undefined,
-    isCurrent: () => boolean
-  ): Promise<void> {
-    if (!toolchainPath) {
-      this.lastMissingToolWarning = undefined;
-      return;
-    }
-
-    const missing = await this.missingToolchainBinariesFinder(toolchainPath);
-    if (!isCurrent()) {
-      return;
-    }
-    if (missing.length === 0) {
-      this.lastMissingToolWarning = undefined;
-      return;
-    }
-
-    const message = `STM32 Build Analyzer: configured toolchain directory is missing `
-      + `${missing.join(', ')}. Missing tools will be resolved from PATH.`;
-    if (message === this.lastMissingToolWarning) {
-      return;
-    }
-
-    this.lastMissingToolWarning = message;
-    vscode.window.showWarningMessage(message);
   }
 }

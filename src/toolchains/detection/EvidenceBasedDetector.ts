@@ -1,9 +1,11 @@
 import * as path from 'path';
 import type { BuildArtifactSet } from '../../artifacts/BuildArtifactSet';
 import {
+  ArtifactInspectionError,
   ArtifactInspector,
   FileArtifactInspector,
 } from '../../artifacts/ArtifactInspector';
+import { parseElfMetadata } from '../../artifacts/ElfMetadata';
 import type {
   DetectionEvidence,
   DetectionEvidenceSource,
@@ -11,6 +13,7 @@ import type {
   ToolchainDetection,
   ToolchainDetector,
 } from '../../analysis/contracts';
+import type { AnalysisDiagnostic } from '../../analysis/diagnostics';
 import { AnalysisCancelledError } from '../../utils/errors';
 
 export interface ToolAvailabilityProbe {
@@ -31,8 +34,15 @@ export interface EvidenceRule {
 
 export interface DetectorDefinition {
   readonly contentRules: readonly EvidenceRule[];
+  readonly elfMachineRules?: readonly ElfMachineEvidenceRule[];
   readonly fileNameRules?: readonly EvidenceRule[];
   readonly toolNames?: readonly string[];
+}
+
+export interface ElfMachineEvidenceRule {
+  readonly machines: readonly number[];
+  readonly description: string;
+  readonly weight: number;
 }
 
 export abstract class EvidenceBasedDetector implements ToolchainDetector {
@@ -60,6 +70,7 @@ export abstract class EvidenceBasedDetector implements ToolchainDetector {
   ): Promise<ToolchainDetection | null> {
     throwIfCancelled(signal);
     const evidence: DetectionEvidence[] = [];
+    const diagnostics: AnalysisDiagnostic[] = [];
 
     if (artifacts.mapPath) {
       const mapContent = await this.artifactInspector.readText(
@@ -72,6 +83,33 @@ export abstract class EvidenceBasedDetector implements ToolchainDetector {
         this.definition.contentRules,
         'file-content'
       );
+    }
+
+    if (artifacts.executablePath && this.definition.elfMachineRules) {
+      try {
+        const metadata = parseElfMetadata(await this.artifactInspector.readBytes(
+          artifacts.executablePath,
+          64,
+          signal
+        ));
+        if (metadata) {
+          for (const rule of this.definition.elfMachineRules) {
+            if (rule.machines.includes(metadata.machine)) {
+              evidence.push({
+                source: 'elf-metadata',
+                description: rule.description,
+                weight: rule.weight,
+              });
+            }
+          }
+        }
+      } catch (error) {
+        if (error instanceof ArtifactInspectionError && evidence.length > 0) {
+          diagnostics.push(error.diagnostic);
+        } else {
+          throw error;
+        }
+      }
     }
 
     this.addConfiguredToolEvidence(evidence);
@@ -89,7 +127,7 @@ export abstract class EvidenceBasedDetector implements ToolchainDetector {
         evidence.reduce((total, item) => total + item.weight, 0)
       ),
       evidence,
-      diagnostics: [],
+      diagnostics,
     };
   }
 

@@ -6,3 +6,4 @@ export * from './diagnostics';
 export * from '../artifacts/ArtifactInspector';
 export * from '../artifacts/BuildArtifactValidator';
 export * from '../artifacts/BuildArtifactSet';
+export * from '../artifacts/ElfMetadata';

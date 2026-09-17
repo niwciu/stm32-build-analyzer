@@ -101,6 +101,20 @@ export class GnuArmAdapter implements ToolchainAdapter {
 
     for (const definition of GNU_ARM_TOOLS) {
       const resolution = this.toolResolver.resolve(definition.name);
+      if (
+        this.toolchainPath
+        && resolution.source === 'path'
+        && resolution.configuredCandidate
+      ) {
+        diagnostics.push(createAnalysisDiagnostic({
+          code: ANALYSIS_DIAGNOSTIC_CODES.ANALYSIS_PARTIAL,
+          severity: 'warning',
+          message: `Configured toolchain directory does not contain ${definition.name}; validation is falling back to PATH.`,
+          toolchainId: this.toolchainId,
+          artifactPath: resolution.configuredCandidate,
+          remediation: 'Install the missing configured binary or correct stm32BuildAnalyzerEnhanced.toolchainPath.',
+        }));
+      }
       let version: string | undefined;
       try {
         version = firstLine(await this.executeTool(

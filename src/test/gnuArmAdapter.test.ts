@@ -176,6 +176,31 @@ suite('GnuArmAdapter', () => {
     assert.strictEqual(validation.diagnostics.length, 1);
   });
 
+  test('warns when configured binaries fall back to PATH', async () => {
+    const resolver: ToolResolver = {
+      resolve: tool => ({
+        command: tool,
+        source: 'path',
+        configuredCandidate: path.join('/configured', 'bin', tool),
+      }),
+    };
+    const adapter = new GnuArmAdapter('/configured/bin', false, {
+      toolRunner: async command => successfulResult(
+        command === 'arm-none-eabi-objdump' ? 'GNU objdump 2.42' : 'GNU nm 2.42'
+      ),
+      toolResolver: resolver,
+    });
+
+    const validation = await adapter.validateEnvironment(artifacts());
+
+    assert.strictEqual(validation.status, 'valid');
+    assert.strictEqual(validation.diagnostics.length, 2);
+    assert.ok(validation.diagnostics.every(diagnostic =>
+      diagnostic.code === ANALYSIS_DIAGNOSTIC_CODES.ANALYSIS_PARTIAL
+      && diagnostic.message.includes('falling back to PATH')
+    ));
+  });
+
   test('provides actionable structured errors for fatal tool failures', async () => {
     const runner: ToolRunner = async () => failedResult('not an ELF file');
 
