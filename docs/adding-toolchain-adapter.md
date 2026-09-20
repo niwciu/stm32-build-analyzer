@@ -39,6 +39,14 @@ depend on a locally installed vendor toolchain. Add the adapter to
 `createDefaultAdapterRegistry` only when its contract and fixture tests pass.
 The adapter ID must exactly match its detector ID.
 
+For GNU/binutils families, extend `GnuBinutilsAdapter` instead of duplicating
+the linker-map, `objdump`, `nm`, process-control, and provenance workflow. Each
+concrete adapter supplies a `GnuBinutilsAdapterDefinition` containing its
+display name, target architecture, executable names, log label, and temporary
+directory prefix. Keep the concrete class free of branches for other GNU
+targets and register it independently. Apply the reusable contract in
+`src/test/contracts/gnuAdapterContract.ts` to every concrete GNU adapter.
+
 ## 3. Add fixtures
 
 Create cases below:

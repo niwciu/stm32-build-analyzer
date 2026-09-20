@@ -78,3 +78,12 @@ Cancellation remains distinct and is never reported as a tool failure.
 
 See [Adding a toolchain adapter](adding-toolchain-adapter.md) for the required
 detector, adapter, fixture, registration, and verification steps.
+
+## Shared GNU/binutils foundation
+
+GNU linker MAP parsing, `objdump` section parsing, `nm` symbol parsing, bounded
+tool execution, executable-copy handling, and provenance live under
+`src/toolchains/gnu`. `GnuBinutilsAdapter` configures this workflow with target
+identity, architecture metadata, and executable names. `GnuArmAdapter` remains
+a concrete adapter that supplies only GNU Arm configuration; GNU RISC-V remains
+recognized but unsupported until its separate adapter step is approved.

@@ -4,7 +4,7 @@ import * as path from 'path';
 import {
   GnuLinkerMapParser,
   isGnuCatchAllRegion,
-} from '../toolchains/gnu-arm/GnuLinkerMapParser';
+} from '../toolchains/gnu/GnuLinkerMapParser';
 
 const SAMPLE_MAP = `
 Memory Configuration

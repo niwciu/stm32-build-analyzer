@@ -4,7 +4,7 @@ import * as path from 'path';
 import {
   GnuBinutilsParser,
   GnuRegion,
-} from '../toolchains/gnu-arm/GnuBinutilsParser';
+} from '../toolchains/gnu/GnuBinutilsParser';
 
 suite('GnuBinutilsParser', () => {
   const parser = new GnuBinutilsParser();

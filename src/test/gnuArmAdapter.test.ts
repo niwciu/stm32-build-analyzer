@@ -6,11 +6,10 @@ import type { AnalyzedMemoryRegion } from '../analysis/contracts';
 import { ANALYSIS_DIAGNOSTIC_CODES } from '../analysis/diagnostics';
 import type { ToolResolver } from '../process/ToolResolver';
 import type { ToolRunner, ToolRunResult } from '../process/ToolRunner';
-import {
-  GnuArmAdapter,
-  ToolExecutionError,
-} from '../toolchains/gnu-arm/GnuArmAdapter';
+import { GnuArmAdapter } from '../toolchains/gnu-arm/GnuArmAdapter';
+import { ToolExecutionError } from '../toolchains/gnu/GnuBinutilsAdapter';
 import { AnalysisCancelledError } from '../utils/errors';
+import { defineGnuAdapterContract } from './contracts/gnuAdapterContract';
 import { loadToolchainFixtures } from './fixtures/fixtureLoader';
 
 interface ExpectedAnalysisFixture {
@@ -31,6 +30,19 @@ if (!fixture || gnuArmAnalysisFixtures.length === 0) {
 const mapPath = fixture.inputPaths.map;
 const objdumpOutput = fs.readFileSync(fixture.inputPaths.objdumpStdout, 'utf8');
 const nmOutput = fs.readFileSync(fixture.inputPaths.nmStdout, 'utf8');
+
+defineGnuAdapterContract({
+  name: 'shared GNU/binutils adapter contract (GNU Arm)',
+  toolchainId: 'gnu-arm-none-eabi',
+  displayName: 'GNU Arm Embedded',
+  targetArchitecture: 'Arm',
+  objdumpTool: 'arm-none-eabi-objdump',
+  nmTool: 'arm-none-eabi-nm',
+  createAdapter: (toolRunner, toolResolver) => new GnuArmAdapter('', false, {
+    toolRunner,
+    toolResolver,
+  }),
+});
 
 suite('GnuArmAdapter', () => {
   let tempDirectory: string;
@@ -69,6 +81,8 @@ suite('GnuArmAdapter', () => {
       assert.deepStrictEqual(normalizeRegions(analysis.regions), expected.regions);
       assert.deepStrictEqual(analysis.warnings, expected.warnings);
       assert.strictEqual(analysis.toolchain.id, 'gnu-arm-none-eabi');
+      assert.strictEqual(analysis.toolchain.displayName, 'GNU Arm Embedded');
+      assert.strictEqual(analysis.toolchain.targetArchitecture, 'Arm');
       assert.strictEqual(analysis.provenance.adapterId, 'gnu-arm-none-eabi');
       assert.deepStrictEqual(
         analysis.provenance.toolInvocations.map(invocation => invocation.arguments),
