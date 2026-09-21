@@ -10,6 +10,11 @@ export class KeilDetector extends EvidenceBasedDetector {
     super({
       contentRules: [
         {
+          pattern: /Component:\s*ARM Compiler\s+5\.[^\r\n]*Tool:\s*armlink/i,
+          description: 'Arm Compiler 5 armlink component header.',
+          weight: 0.8,
+        },
+        {
           pattern: /\bARM Linker,\s*(?:RVCT|ARM Compiler|\d)/i,
           description: 'Arm armlink producer header.',
           weight: 0.7,

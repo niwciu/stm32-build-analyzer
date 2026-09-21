@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "keil-armclang6-synthetic-map",
+  "toolchain": "keil-armclang",
+  "kind": "analysis",
+  "origin": {
+    "type": "synthetic",
+    "documentation": [
+      "https://www.keil.com/support/man/docs/armclang_intro/default.htm",
+      "https://www.keil.com/support/man/docs/armlink/default.htm"
+    ],
+    "notes": "Hand-authored Arm Compiler 6.21 MAP excerpt covering explicit execution/load addresses, initialized-data load images, zero data, and symbols. Compiler 6 remains experimental until a redistributable real fixture is added."
+  },
+  "inputs": { "map": "firmware.map" },
+  "expected": "expected-analysis.json",
+  "ignored": []
+}

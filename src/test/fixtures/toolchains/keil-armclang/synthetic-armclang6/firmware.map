@@ -1,0 +1,27 @@
+ARM Linker, 6.21
+
+Memory Map of the image
+
+  Image Entry point : 0x08000001
+
+  Load Region LR_IROM1 (Base: 0x08000000, Size: 0x00000018, Max: 0x00000100, ABSOLUTE)
+
+    Execution Region ER_IROM1 (Exec base: 0x08000000, Load base: 0x08000000, Size: 0x00000014, Max: 0x00000100, ABSOLUTE)
+
+    Exec Addr    Load Addr    Size         Type   Attr      Idx    E Section Name        Object
+    0x08000000   0x08000000   0x00000010   Code   RO           1    .text               app.o
+    0x08000010   0x08000010   0x00000004   Data   RO           2    .rodata             app.o
+
+    Execution Region RW_IRAM1 (Exec base: 0x20000000, Load base: 0x08000014, Size: 0x0000000c, Max: 0x00000080, ABSOLUTE)
+
+    Exec Addr    Load Addr    Size         Type   Attr      Idx    E Section Name        Object
+    0x20000000   0x08000014   0x00000004   Data   RW           3    .data               app.o
+    0x20000004   0x20000004   0x00000008   Zero   RW           4    .bss                app.o
+
+Image Symbol Table
+
+Global Symbols
+
+Symbol Name                              Value     Ov Type        Size  Object(Section)
+main                                0x08000001   Thumb Code        16  app.o(.text)
+counter                             0x20000000   Data               4  app.o(.data)

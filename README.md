@@ -32,7 +32,7 @@ This fork removes that dependency, adds broader file handling, and enhances the 
 - Visual panel with color-coded usage (RAM, Flash)
 - Sorting by symbol name/address/size within each section
 - Search filter for regions/sections/symbols with optional case sensitivity
-- GNU Arm, GNU RISC-V, verified Espressif GNU Xtensa, and native LLD/LLVM integration
+- GNU Arm, GNU RISC-V, verified Espressif GNU Xtensa, native LLD/LLVM, and verified armlink MAP integration
 - Compatible with any build system
 - Build multiple folders auto detection
 - Option to point manualy to map and elf object (even wihout .elf .map extension)

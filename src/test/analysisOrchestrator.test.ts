@@ -71,7 +71,13 @@ suite('AdapterRegistry', () => {
   test('the default registry contains all implemented adapters', () => {
     assert.deepStrictEqual(
       createDefaultAdapterRegistry('').toolchainIds,
-      ['gnu-arm-none-eabi', 'gnu-riscv-none-elf', 'gnu-xtensa-elf', 'llvm']
+      [
+        'gnu-arm-none-eabi',
+        'gnu-riscv-none-elf',
+        'gnu-xtensa-elf',
+        'keil-armclang',
+        'llvm',
+      ]
     );
   });
 });

@@ -93,3 +93,8 @@ LLVM reuses the bounded execution and provenance workflow while injecting its
 own native LLD region parser and `llvm-objdump` section parser. The region-parser
 interface receives selected linker scripts because native LLD MAP output does
 not contain region capacities. See [LLVM adapter design](llvm-adapter-design.md).
+
+Keil/Arm Compiler analysis uses a MAP-only adapter because verified armlink
+reports already contain execution-region capacities, section placement, and an
+optional symbol table. It invokes no proprietary executable. See
+[Keil adapter design](keil-adapter-design.md).

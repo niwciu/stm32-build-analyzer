@@ -15,7 +15,7 @@ adapters.
 | GNU RISC-V Embedded | Supported; validates GNU RISC-V tools and analyzes memory, sections, and symbols. |
 | GNU Xtensa Embedded | Supported for the verified Espressif ESP32, ESP32-S2, and ESP32-S3 variants described below. |
 | LLVM/Clang | Supported for native LLD ELF/MAP output with materialized literal `MEMORY` declarations. |
-| Keil/Arm Compiler | Recognized; returns `unsupported` without invoking GNU Arm tools. |
+| Keil/Arm Compiler | Arm Compiler 5.06 update 5 MAP analysis is supported; the documented Arm Compiler 6.21 layout is experimental. |
 | IAR Embedded Workbench for Arm | Recognized; returns `unsupported` without invoking GNU Arm tools. |
 
 `unknown` means no detector reached the selection threshold. `ambiguous` means
@@ -76,6 +76,11 @@ evidence for future UI diagnostics.
   through the workspace root. Computed expressions and GNU-style MAP output
   from Clang builds are not yet supported. See
   [LLVM adapter design](llvm-adapter-design.md).
+- Keil analysis parses armlink MAP reports without invoking AXF files or
+  proprietary tools. Arm Compiler 5.06 update 5 has real-fixture coverage;
+  Arm Compiler 6.21 currently has documented synthetic coverage only. Missing
+  execution-region declarations produce partial results rather than inferred
+  capacities. See [Keil adapter design](keil-adapter-design.md).
 - A generic GNU linker MAP without architecture evidence from either the MAP or
   ELF header is intentionally unknown. Mixed strong markers are intentionally
   ambiguous.

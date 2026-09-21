@@ -1,0 +1,26 @@
+{
+  "regions": [
+    {
+      "name": "ER_IROM1",
+      "startAddress": 134217728,
+      "size": 256,
+      "used": 24,
+      "sections": [
+        { "name": ".text", "startAddress": 134217728, "size": 16, "loadAddress": 134217728, "symbols": [{ "name": "main", "startAddress": 134217729, "size": 16 }] },
+        { "name": ".rodata", "startAddress": 134217744, "size": 4, "loadAddress": 134217744, "symbols": [] },
+        { "name": ".data", "startAddress": 134217748, "size": 4, "loadAddress": 134217748, "symbols": [] }
+      ]
+    },
+    {
+      "name": "RW_IRAM1",
+      "startAddress": 536870912,
+      "size": 128,
+      "used": 12,
+      "sections": [
+        { "name": ".data", "startAddress": 536870912, "size": 4, "loadAddress": 134217748, "symbols": [{ "name": "counter", "startAddress": 536870912, "size": 4 }] },
+        { "name": ".bss", "startAddress": 536870916, "size": 8, "loadAddress": null, "symbols": [] }
+      ]
+    }
+  ],
+  "warningCount": 0
+}

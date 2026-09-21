@@ -18,12 +18,17 @@ import {
   LlvmAdapter,
   LlvmAdapterDependencies,
 } from '../toolchains/llvm/LlvmAdapter';
+import {
+  KeilAdapter,
+  KeilAdapterDependencies,
+} from '../toolchains/keil/KeilAdapter';
 
 export interface DefaultAdapterRegistryDependencies {
   readonly gnuArm?: GnuArmAdapterDependencies;
   readonly gnuRiscV?: GnuRiscVAdapterDependencies;
   readonly gnuXtensa?: GnuXtensaAdapterDependencies;
   readonly llvm?: LlvmAdapterDependencies;
+  readonly keil?: KeilAdapterDependencies;
 }
 
 export class AdapterRegistry {
@@ -63,5 +68,6 @@ export function createDefaultAdapterRegistry(
     new GnuRiscVAdapter(toolchainPath, debug, dependencies.gnuRiscV),
     new GnuXtensaAdapter(toolchainPath, debug, dependencies.gnuXtensa),
     new LlvmAdapter(toolchainPath, debug, dependencies.llvm),
+    new KeilAdapter(dependencies.keil),
   ]);
 }

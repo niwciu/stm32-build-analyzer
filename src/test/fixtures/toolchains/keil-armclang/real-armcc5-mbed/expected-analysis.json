@@ -1,0 +1,15 @@
+{
+  "regions": [{
+    "name": "ER_IROM1",
+    "startAddress": 110592,
+    "size": 151552,
+    "used": 406,
+    "sections": [
+      { "name": "RESET", "startAddress": 110592, "size": 192, "loadAddress": 110592, "symbols": [] },
+      { "name": "!!!main", "startAddress": 110784, "size": 8, "loadAddress": 110784, "symbols": [] },
+      { "name": ".text", "startAddress": 111212, "size": 152, "loadAddress": 111212, "symbols": [] },
+      { "name": "i._Z9time_funcPN4mbed5TimerEi", "startAddress": 132768, "size": 54, "loadAddress": 132768, "symbols": [] }
+    ]
+  }],
+  "warningCount": 1
+}
