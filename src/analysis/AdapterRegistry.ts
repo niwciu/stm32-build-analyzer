@@ -6,6 +6,15 @@ import {
   GnuArmAdapter,
   GnuArmAdapterDependencies,
 } from '../toolchains/gnu-arm/GnuArmAdapter';
+import {
+  GnuRiscVAdapter,
+  GnuRiscVAdapterDependencies,
+} from '../toolchains/gnu-riscv/GnuRiscVAdapter';
+
+export interface DefaultAdapterRegistryDependencies {
+  readonly gnuArm?: GnuArmAdapterDependencies;
+  readonly gnuRiscV?: GnuRiscVAdapterDependencies;
+}
 
 export class AdapterRegistry {
   private readonly adapters = new Map<KnownToolchainId, ToolchainAdapter>();
@@ -37,9 +46,10 @@ export class AdapterRegistry {
 export function createDefaultAdapterRegistry(
   toolchainPath: string,
   debug: boolean = false,
-  dependencies: GnuArmAdapterDependencies = {}
+  dependencies: DefaultAdapterRegistryDependencies = {}
 ): AdapterRegistry {
   return new AdapterRegistry([
-    new GnuArmAdapter(toolchainPath, debug, dependencies),
+    new GnuArmAdapter(toolchainPath, debug, dependencies.gnuArm),
+    new GnuRiscVAdapter(toolchainPath, debug, dependencies.gnuRiscV),
   ]);
 }

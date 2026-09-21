@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "gnu-riscv-real-minimal-rv32",
+  "toolchain": "gnu-riscv-none-elf",
+  "kind": "analysis",
+  "origin": {
+    "type": "real",
+    "documentation": [
+      "https://github.com/riscv-collab/riscv-gnu-toolchain/blob/master/README.md",
+      "https://riscv-non-isa.github.io/riscv-elf-psabi-doc/",
+      "https://sourceware.org/binutils/docs/binutils/objdump.html",
+      "https://sourceware.org/binutils/docs/binutils/nm.html"
+    ],
+    "notes": "Real RV32IMAC ELF and reports generated with GNU assembler, linker, objdump, and nm. The fixture is intentionally freestanding and links no runtime libraries.",
+    "compilerVersion": "GNU Binutils 2.42-1ubuntu1+6 (Ubuntu noble binutils-riscv64-unknown-elf)",
+    "targetArchitecture": "RV32IMAC, ILP32, ELF32 little-endian",
+    "buildFlags": [
+      "as -march=rv32imac -mabi=ilp32 -g --debug-prefix-map=$PWD=.",
+      "ld -m elf32lriscv -T linker.ld"
+    ],
+    "sourceLicense": "MIT",
+    "artifactLicense": "MIT; generated solely from the included source and linker script with no runtime libraries",
+    "provenance": "Generated locally from Ubuntu package binutils-riscv64-unknown-elf 2.42-1ubuntu1+6 using the included startup.S and linker.ld.",
+    "generationCommand": "riscv64-unknown-elf-as -march=rv32imac -mabi=ilp32 -g --debug-prefix-map=$PWD=. -o firmware.o startup.S && riscv64-unknown-elf-ld -m elf32lriscv -T linker.ld -Map firmware.map -o firmware.elf firmware.o && riscv64-unknown-elf-objdump -h firmware.elf > objdump-sections.txt && riscv64-unknown-elf-nm -C -S -n -l --defined-only firmware.elf > nm-symbols.txt"
+  },
+  "inputs": {
+    "source": "startup.S",
+    "linkerScript": "linker.ld",
+    "object": "firmware.o",
+    "map": "firmware.map",
+    "executable": "firmware.elf",
+    "objdumpStdout": "objdump-sections.txt",
+    "nmStdout": "nm-symbols.txt"
+  },
+  "expected": "expected-analysis.json",
+  "ignored": []
+}

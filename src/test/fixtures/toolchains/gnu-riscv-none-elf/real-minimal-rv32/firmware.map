@@ -1,0 +1,52 @@
+
+There are no discarded input sections
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+FLASH            0x20000000         0x00010000         xr
+RAM              0x80000000         0x00004000         xrw
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+
+.text           0x20000000       0x10
+ *(.text*)
+ .text          0x20000000        0x0 firmware.o
+ .text.start    0x20000000       0x10 firmware.o
+                0x20000000                _start
+
+.data           0x80000000        0x4 load address 0x20000010
+ *(.data*)
+ .data          0x80000000        0x0 firmware.o
+ .data.counter  0x80000000        0x4 firmware.o
+                0x80000000                counter
+
+.bss            0x80000004        0x0 load address 0x20000014
+ *(.bss*)
+ .bss           0x80000004        0x0 firmware.o
+ *(COMMON)
+LOAD firmware.o
+OUTPUT(firmware.elf elf32-littleriscv)
+
+.riscv.attributes
+                0x00000000       0x32
+ .riscv.attributes
+                0x00000000       0x32 firmware.o
+
+.debug_line     0x00000000       0x47
+ .debug_line    0x00000000       0x47 firmware.o
+
+.debug_info     0x00000000       0x35
+ .debug_info    0x00000000       0x35 firmware.o
+
+.debug_abbrev   0x00000000       0x21
+ .debug_abbrev  0x00000000       0x21 firmware.o
+
+.debug_aranges  0x00000000       0x20
+ .debug_aranges
+                0x00000000       0x20 firmware.o
+
+.debug_str      0x00000000       0x1f
+ .debug_str     0x00000000       0x1f firmware.o

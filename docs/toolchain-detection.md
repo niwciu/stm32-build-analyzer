@@ -3,15 +3,15 @@
 Phase 1 detection is evidence-based and read-only. Detectors inspect MAP text,
 the fixed ELF header prefix, and artifact names; they never execute a build
 artifact. The registry recognizes GNU Arm Embedded, GNU RISC-V, GNU Xtensa,
-LLVM LLD, Arm/Keil armlink, and IAR ILINK. Only GNU Arm has an analysis adapter
-in this phase.
+LLVM LLD, Arm/Keil armlink, and IAR ILINK. GNU Arm and GNU RISC-V have analysis
+adapters.
 
 ## Support and result states
 
-| Detected family | Phase 1 behavior |
+| Detected family | Current behavior |
 | --- | --- |
 | GNU Arm Embedded (`arm-none-eabi`) | Supported; validates GNU Arm tools and analyzes memory, sections, and symbols. |
-| GNU RISC-V Embedded | Recognized; returns `unsupported` without invoking GNU Arm tools. |
+| GNU RISC-V Embedded | Supported; validates GNU RISC-V tools and analyzes memory, sections, and symbols. |
 | GNU Xtensa Embedded | Recognized; returns `unsupported` without invoking GNU Arm tools. |
 | LLVM/Clang | Recognized; returns `unsupported` without invoking GNU Arm tools. |
 | Keil/Arm Compiler | Recognized; returns `unsupported` without invoking GNU Arm tools. |
@@ -47,11 +47,16 @@ evidence for future UI diagnostics.
 
 ## Current limitations
 
-- Phase 1 reads ELF class, byte order, and machine metadata only. It does not
+- Detection reads ELF class, byte order, and machine metadata only. It does not
   yet parse ELF producer comments or target-specific attributes.
-- The fixtures are minimal, synthetic excerpts derived from GNU Binutils, LLVM
-  LLD, Arm linker, and IAR linker documentation. Their manifests record exact
-  documentation references and case-specific limitations.
+- Most fixtures are minimal, synthetic excerpts derived from GNU Binutils, LLVM
+  LLD, Arm linker, and IAR linker documentation. GNU RISC-V additionally has a
+  real, freestanding RV32IMAC/ILP32 fixture generated with GNU Binutils 2.42.
+  Fixture manifests record provenance and case-specific limitations.
+- GNU RISC-V tool discovery supports the `riscv64-unknown-elf-`,
+  `riscv32-unknown-elf-`, `riscv64-none-elf-`, `riscv32-none-elf-`, and
+  `riscv-none-elf-` prefixes. The configured toolchain directory takes
+  precedence over `PATH`.
 - Vendor-specific GNU Xtensa triples and older/newer proprietary MAP layouts
   need legally redistributable real fixtures before support can be claimed.
 - A generic GNU linker MAP without architecture evidence from either the MAP or

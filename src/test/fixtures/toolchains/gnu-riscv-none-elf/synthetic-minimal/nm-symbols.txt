@@ -1,0 +1,3 @@
+20000000 00000010 T _start	src/startup.S:9
+80000000 00000004 D counter	src/main.c:5
+80000008 00000004 B buffer	src/main.c:6

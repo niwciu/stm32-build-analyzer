@@ -41,10 +41,11 @@ export class GnuRiscVDetector extends EvidenceBasedDetector {
         weight: 0.1,
       }],
       toolNames: [
-        'riscv-none-elf-objdump',
-        'riscv64-none-elf-objdump',
-        'riscv32-unknown-elf-objdump',
         'riscv64-unknown-elf-objdump',
+        'riscv32-unknown-elf-objdump',
+        'riscv64-none-elf-objdump',
+        'riscv32-none-elf-objdump',
+        'riscv-none-elf-objdump',
       ],
     }, dependencies);
   }

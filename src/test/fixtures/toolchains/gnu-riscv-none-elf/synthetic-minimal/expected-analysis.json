@@ -1,0 +1,82 @@
+{
+  "regions": [
+    {
+      "name": "FLASH",
+      "startAddress": 536870912,
+      "size": 65536,
+      "used": 40,
+      "sections": [
+        {
+          "name": ".text",
+          "startAddress": 536870912,
+          "size": 32,
+          "loadAddress": 536870912,
+          "symbols": [
+            {
+              "name": "_start",
+              "startAddress": 536870912,
+              "size": 16,
+              "source": {
+                "path": "src/startup.S",
+                "line": 9,
+                "column": null
+              }
+            }
+          ]
+        },
+        {
+          "name": ".data",
+          "startAddress": 536870944,
+          "size": 8,
+          "loadAddress": 536870944,
+          "symbols": []
+        }
+      ]
+    },
+    {
+      "name": "RAM",
+      "startAddress": 2147483648,
+      "size": 16384,
+      "used": 16,
+      "sections": [
+        {
+          "name": ".data",
+          "startAddress": 2147483648,
+          "size": 8,
+          "loadAddress": 536870944,
+          "symbols": [
+            {
+              "name": "counter",
+              "startAddress": 2147483648,
+              "size": 4,
+              "source": {
+                "path": "src/main.c",
+                "line": 5,
+                "column": null
+              }
+            }
+          ]
+        },
+        {
+          "name": ".bss",
+          "startAddress": 2147483656,
+          "size": 8,
+          "loadAddress": 2147483656,
+          "symbols": [
+            {
+              "name": "buffer",
+              "startAddress": 2147483656,
+              "size": 4,
+              "source": {
+                "path": "src/main.c",
+                "line": 6,
+                "column": null
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}

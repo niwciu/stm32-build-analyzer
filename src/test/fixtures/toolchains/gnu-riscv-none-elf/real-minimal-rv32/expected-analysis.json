@@ -1,0 +1,59 @@
+{
+  "regions": [
+    {
+      "name": "FLASH",
+      "startAddress": 536870912,
+      "size": 65536,
+      "used": 20,
+      "sections": [
+        {
+          "name": ".text",
+          "startAddress": 536870912,
+          "size": 16,
+          "loadAddress": 536870912,
+          "symbols": [
+            {
+              "name": "_start",
+              "startAddress": 536870912,
+              "size": 16,
+              "source": {
+                "path": "startup.S",
+                "line": 7,
+                "column": null
+              }
+            }
+          ]
+        },
+        {
+          "name": ".data",
+          "startAddress": 536870928,
+          "size": 4,
+          "loadAddress": 536870928,
+          "symbols": []
+        }
+      ]
+    },
+    {
+      "name": "RAM",
+      "startAddress": 2147483648,
+      "size": 16384,
+      "used": 4,
+      "sections": [
+        {
+          "name": ".data",
+          "startAddress": 2147483648,
+          "size": 4,
+          "loadAddress": 536870928,
+          "symbols": [
+            {
+              "name": "counter",
+              "startAddress": 2147483648,
+              "size": 4
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}

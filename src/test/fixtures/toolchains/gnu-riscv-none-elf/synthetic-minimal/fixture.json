@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "gnu-riscv-synthetic-minimal",
+  "toolchain": "gnu-riscv-none-elf",
+  "kind": "analysis",
+  "origin": {
+    "type": "synthetic",
+    "documentation": [
+      "https://sourceware.org/binutils/docs/ld/MEMORY.html",
+      "https://sourceware.org/binutils/docs/binutils/objdump.html",
+      "https://sourceware.org/binutils/docs/binutils/nm.html",
+      "https://riscv-non-isa.github.io/riscv-elf-psabi-doc/"
+    ],
+    "notes": "Hand-authored minimal GNU RISC-V MAP, objdump, and nm excerpts. It validates shared adapter semantics but is not evidence of compatibility with a particular toolchain release."
+  },
+  "inputs": {
+    "map": "firmware.map",
+    "objdumpStdout": "objdump-sections.txt",
+    "nmStdout": "nm-symbols.txt"
+  },
+  "expected": "expected-analysis.json",
+  "ignored": []
+}

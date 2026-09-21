@@ -68,10 +68,10 @@ suite('AdapterRegistry', () => {
     ]), /Duplicate adapter/);
   });
 
-  test('the Phase 1 default registry contains only GNU Arm', () => {
+  test('the Phase 2 default registry contains GNU Arm and GNU RISC-V', () => {
     assert.deepStrictEqual(
       createDefaultAdapterRegistry('').toolchainIds,
-      ['gnu-arm-none-eabi']
+      ['gnu-arm-none-eabi', 'gnu-riscv-none-elf']
     );
   });
 });

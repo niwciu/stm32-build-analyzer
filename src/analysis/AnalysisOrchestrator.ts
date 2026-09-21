@@ -5,10 +5,10 @@ import {
 } from '../artifacts/BuildArtifactValidator';
 import { AnalysisCancelledError } from '../utils/errors';
 import type { DetectorDependencies } from '../toolchains/detection/EvidenceBasedDetector';
-import type { GnuArmAdapterDependencies } from '../toolchains/gnu-arm/GnuArmAdapter';
 import {
   AdapterRegistry,
   createDefaultAdapterRegistry,
+  DefaultAdapterRegistryDependencies,
 } from './AdapterRegistry';
 import type {
   BuildAnalysisResult,
@@ -41,7 +41,7 @@ export interface DefaultAnalysisOrchestratorOptions {
   readonly debug?: boolean;
   readonly detectorDependencies?: DetectorDependencies;
   readonly detectionOptions?: DetectionRegistryOptions;
-  readonly adapterDependencies?: GnuArmAdapterDependencies;
+  readonly adapterDependencies?: DefaultAdapterRegistryDependencies;
   readonly artifactValidator?: BuildArtifactValidator;
 }
 

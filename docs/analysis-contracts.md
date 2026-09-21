@@ -56,9 +56,9 @@ tool that prevents all analysis.
 
 The orchestrator validates that both MAP and executable artifacts are readable,
 then runs detection, and only then looks up an adapter. The default adapter
-registry contains only `gnu-arm-none-eabi`. Recognized LLVM, Keil/Arm Compiler,
-IAR Arm, GNU RISC-V, and GNU Xtensa builds therefore return `unsupported`
-without validating or invoking GNU Arm tools.
+registry contains `gnu-arm-none-eabi` and `gnu-riscv-none-elf`. Recognized LLVM,
+Keil/Arm Compiler, IAR Arm, and GNU Xtensa builds therefore return `unsupported`
+without validating or invoking GNU tools for a different target.
 
 Unknown and conflicting evidence return `unknown` and `ambiguous` unchanged.
 An unsupported diagnostic names the detected family, explains that its adapter
@@ -84,6 +84,6 @@ detector, adapter, fixture, registration, and verification steps.
 GNU linker MAP parsing, `objdump` section parsing, `nm` symbol parsing, bounded
 tool execution, executable-copy handling, and provenance live under
 `src/toolchains/gnu`. `GnuBinutilsAdapter` configures this workflow with target
-identity, architecture metadata, and executable names. `GnuArmAdapter` remains
-a concrete adapter that supplies only GNU Arm configuration; GNU RISC-V remains
-recognized but unsupported until its separate adapter step is approved.
+identity, architecture metadata, and executable names. `GnuArmAdapter` and
+`GnuRiscVAdapter` remain separate concrete adapters that supply target-specific
+identity and executable names. Both are registered by default.

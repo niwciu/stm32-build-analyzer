@@ -66,7 +66,7 @@
         "stm32BuildAnalyzerEnhanced.toolchainPath": {
           "type": "string",
           "default": "",
-          "description": "Path to the ARM GNU Embedded toolchain binaries directory (containing arm-none-eabi-objdump, arm-none-eabi-nm, etc.). Supports absolute paths, workspace-relative paths, and variables: ${userHome}, ${workspaceFolder}, ${workspaceFolder:Name}, ${env:VAR}. If not set, tools are resolved from PATH."
+          "description": "Path to GNU Arm or GNU RISC-V toolchain binaries (such as arm-none-eabi-objdump or riscv64-unknown-elf-objdump). Supports absolute paths, workspace-relative paths, and variables: ${userHome}, ${workspaceFolder}, ${workspaceFolder:Name}, ${env:VAR}. If not set, tools are resolved from PATH."
         },
         "stm32BuildAnalyzerEnhanced.debug": {
           "type": "boolean",
