@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "gnu-xtensa-synthetic-esp-idf-esp32s3",
+  "toolchain": "gnu-xtensa-elf",
+  "kind": "analysis",
+  "origin": {
+    "type": "synthetic",
+    "documentation": [
+      "https://github.com/espressif/esp-idf/blob/master/components/esp_system/ld/esp32s3/memory.ld.in",
+      "https://github.com/espressif/esp-idf/blob/master/components/esp_system/ld/esp32s3/sections.ld.in",
+      "https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/api-guides/performance/size.html"
+    ],
+    "notes": "Hand-authored excerpts model the multi-region, 64-bit-width hexadecimal formatting used by an ESP-IDF ESP32-S3 GNU linker MAP plus objdump and nm output. It validates parser structure, not compatibility with every ESP-IDF configuration."
+  },
+  "inputs": {
+    "map": "firmware.map",
+    "objdumpStdout": "objdump-sections.txt",
+    "nmStdout": "nm-symbols.txt"
+  },
+  "expected": "expected-analysis.json",
+  "ignored": []
+}

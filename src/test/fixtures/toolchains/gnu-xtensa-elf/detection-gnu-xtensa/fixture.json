@@ -6,10 +6,11 @@
   "origin": {
     "type": "synthetic",
     "documentation": [
+      "https://github.com/espressif/esp-idf/blob/master/tools/tools.json",
       "https://sourceware.org/binutils/docs/ld/Output-Section-Description.html",
       "https://sourceware.org/binutils/docs/ld/MEMORY.html"
     ],
-    "notes": "Hand-authored GNU ld MAP excerpt with explicit Xtensa architecture and output-format markers. Vendor-specific Xtensa triples and format variants require future real fixtures."
+    "notes": "Hand-authored GNU ld MAP excerpt with a legacy Espressif ESP32 prefix plus explicit Xtensa architecture and output-format markers. Separate analysis fixtures record the verified current toolchain and ESP-IDF layouts."
   },
   "inputs": {
     "map": "firmware.map"

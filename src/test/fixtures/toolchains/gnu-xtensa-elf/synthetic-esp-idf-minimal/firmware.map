@@ -1,0 +1,17 @@
+xtensa-esp32s3-elf-ld
+OUTPUT_ARCH(xtensa)
+OUTPUT_FORMAT(elf32-xtensa-le)
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+iram0_0_seg      0x0000000040378000 0x0000000000054700 xr
+iram0_2_seg      0x0000000042000020 0x00000000007fffe0 xr
+dram0_0_seg      0x000000003fc88000 0x0000000000054700 rw
+drom0_0_seg      0x000000003c000020 0x00000000007fffe0 r
+rtc_iram_seg     0x00000000600fe000 0x0000000000002000 xrw
+rtc_data_seg     0x00000000600fe000 0x0000000000002000 rw
+rtc_slow_seg     0x0000000050000000 0x0000000000002000 rw
+*default*        0x0000000000000000 0xffffffffffffffff
+
+Linker script and memory map

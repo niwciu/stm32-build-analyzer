@@ -1,0 +1,4 @@
+3c000020 00000018 R app_name	main/app_main.c:4
+3fc88000 00000010 D state	main/app_main.c:6
+40378000 00000020 T _start	components/esp_system/start.c:10
+42000020 00000030 T app_main	main/app_main.c:8

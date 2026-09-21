@@ -1,0 +1,2 @@
+3fc88000 00000004 B counter	././main.c:3
+40378004 00000012 T _start	././main.c:5

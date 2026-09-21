@@ -1,0 +1,98 @@
+{
+  "regions": [
+    {
+      "name": "iram0_0_seg",
+      "startAddress": 1077379072,
+      "size": 345856,
+      "used": 32,
+      "sections": [{
+        "name": ".iram0.text",
+        "startAddress": 1077379072,
+        "size": 32,
+        "loadAddress": 1077379072,
+        "symbols": [{
+          "name": "_start",
+          "startAddress": 1077379072,
+          "size": 32,
+          "source": { "path": "components/esp_system/start.c", "line": 10, "column": null }
+        }]
+      }]
+    },
+    {
+      "name": "iram0_2_seg",
+      "startAddress": 1107296288,
+      "size": 8388576,
+      "used": 48,
+      "sections": [{
+        "name": ".flash.text",
+        "startAddress": 1107296288,
+        "size": 48,
+        "loadAddress": 1107296288,
+        "symbols": [{
+          "name": "app_main",
+          "startAddress": 1107296288,
+          "size": 48,
+          "source": { "path": "main/app_main.c", "line": 8, "column": null }
+        }]
+      }]
+    },
+    {
+      "name": "dram0_0_seg",
+      "startAddress": 1070104576,
+      "size": 345856,
+      "used": 16,
+      "sections": [{
+        "name": ".dram0.data",
+        "startAddress": 1070104576,
+        "size": 16,
+        "loadAddress": 1070104576,
+        "symbols": [{
+          "name": "state",
+          "startAddress": 1070104576,
+          "size": 16,
+          "source": { "path": "main/app_main.c", "line": 6, "column": null }
+        }]
+      }]
+    },
+    {
+      "name": "drom0_0_seg",
+      "startAddress": 1006632992,
+      "size": 8388576,
+      "used": 24,
+      "sections": [{
+        "name": ".flash.rodata",
+        "startAddress": 1006632992,
+        "size": 24,
+        "loadAddress": 1006632992,
+        "symbols": [{
+          "name": "app_name",
+          "startAddress": 1006632992,
+          "size": 24,
+          "source": { "path": "main/app_main.c", "line": 4, "column": null }
+        }]
+      }]
+    },
+    {
+      "name": "rtc_iram_seg",
+      "startAddress": 1611653120,
+      "size": 8192,
+      "used": 0,
+      "sections": []
+    },
+    {
+      "name": "rtc_data_seg",
+      "startAddress": 1611653120,
+      "size": 8192,
+      "used": 0,
+      "sections": []
+    },
+    {
+      "name": "rtc_slow_seg",
+      "startAddress": 1342177280,
+      "size": 8192,
+      "used": 0,
+      "sections": []
+    }
+  ],
+  "warnings": []
+}

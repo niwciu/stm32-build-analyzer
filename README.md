@@ -32,7 +32,7 @@ This fork removes that dependency, adds broader file handling, and enhances the 
 - Visual panel with color-coded usage (RAM, Flash)
 - Sorting by symbol name/address/size within each section
 - Search filter for regions/sections/symbols with optional case sensitivity
-- GNU Arm and GNU RISC-V toolchain integration (`objdump`, `nm`)
+- GNU Arm, GNU RISC-V, and verified Espressif GNU Xtensa integration (`objdump`, `nm`)
 - Compatible with any build system
 - Build multiple folders auto detection
 - Option to point manualy to map and elf object (even wihout .elf .map extension)
@@ -104,7 +104,7 @@ The extension auto-detects `.map` + `.elf` files in common build folders. If you
 
 ### Toolchain path behavior
 
-When `toolchainPath` is set, the extension resolves variables and workspace-relative paths, detects the build's GNU Arm or GNU RISC-V family, then uses the matching `objdump` and `nm` binaries from that directory. Supported RISC-V prefixes include the common `riscv64-unknown-elf-`, `riscv32-unknown-elf-`, and `riscv*-none-elf-` variants.
+When `toolchainPath` is set, the extension resolves variables and workspace-relative paths, detects the build's supported GNU family, then uses the matching `objdump` and `nm` binaries from that directory. Supported RISC-V prefixes include the common `riscv64-unknown-elf-`, `riscv32-unknown-elf-`, and `riscv*-none-elf-` variants. Verified Xtensa support covers Espressif's `xtensa-esp-elf-` toolchain for ESP32, ESP32-S2, and ESP32-S3, plus their legacy chip-specific prefixes.
 If it is **not** set, tools are resolved from your system `PATH`. If a configured directory is missing an individual binary, the extension reports it and falls back to that tool from `PATH`. Tool execution failures are shown as errors instead of displaying misleading `0 B` usage.
 Changes to path settings take effect automatically without reloading the VS Code window.
 Unset environment variables and unknown named workspace folders are reported explicitly instead of being replaced with an empty string.
@@ -116,7 +116,7 @@ Unset environment variables and unknown named workspace folders are reported exp
 | --- | --- | --- | --- |
 | `stm32BuildAnalyzerEnhanced.mapFilePath` | string | `""` | Absolute or workspace-relative path to the `.map` file. Supports `${userHome}`, `${workspaceFolder}`, `${workspaceFolder:Name}`, and `${env:VAR}`. |
 | `stm32BuildAnalyzerEnhanced.elfFilePath` | string | `""` | Absolute or workspace-relative path to the `.elf` file. Supports `${userHome}`, `${workspaceFolder}`, `${workspaceFolder:Name}`, and `${env:VAR}`. |
-| `stm32BuildAnalyzerEnhanced.toolchainPath` | string | `""` | Absolute or workspace-relative path to GNU Arm or GNU RISC-V toolchain binaries. Supports `${userHome}`, `${workspaceFolder}`, `${workspaceFolder:Name}`, and `${env:VAR}`. |
+| `stm32BuildAnalyzerEnhanced.toolchainPath` | string | `""` | Absolute or workspace-relative path to supported GNU Arm, RISC-V, or Xtensa toolchain binaries. Supports `${userHome}`, `${workspaceFolder}`, `${workspaceFolder:Name}`, and `${env:VAR}`. |
 | `stm32BuildAnalyzerEnhanced.manualBuildPairs` | array | `[]` | List of manual map/elf pairs for builds with non-matching names or locations. Unbuilt pairs are skipped. Path fields support the same variables as the individual path settings. |
 | `stm32BuildAnalyzerEnhanced.debug` | boolean | `false` | Enable verbose logging for debugging purposes. |
 

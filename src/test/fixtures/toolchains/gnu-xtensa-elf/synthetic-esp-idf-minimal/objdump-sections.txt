@@ -1,0 +1,12 @@
+firmware.elf:     file format elf32-xtensa-le
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .iram0.text   00000020  40378000  40378000  00001000  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  1 .flash.text   00000030  42000020  42000020  00002020  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  2 .dram0.data   00000010  3fc88000  3fc88000  00003000  2**2
+                  CONTENTS, ALLOC, LOAD, DATA
+  3 .flash.rodata 00000018  3c000020  3c000020  00004020  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA

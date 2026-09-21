@@ -40,7 +40,12 @@ export class GnuXtensaDetector extends EvidenceBasedDetector {
         description: 'Artifact filename contains an Xtensa target hint.',
         weight: 0.1,
       }],
-      toolNames: ['xtensa-elf-objdump', 'xtensa-esp32-elf-objdump'],
+      toolNames: [
+        'xtensa-esp-elf-objdump',
+        'xtensa-esp32-elf-objdump',
+        'xtensa-esp32s2-elf-objdump',
+        'xtensa-esp32s3-elf-objdump',
+      ],
     }, dependencies);
   }
 }

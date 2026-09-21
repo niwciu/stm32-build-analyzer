@@ -1,0 +1,49 @@
+{
+  "regions": [
+    {
+      "name": "iram0_0_seg",
+      "startAddress": 1077379072,
+      "size": 345856,
+      "used": 22,
+      "sections": [
+        {
+          "name": ".iram0.text",
+          "startAddress": 1077379072,
+          "size": 22,
+          "loadAddress": 1077379072,
+          "symbols": [
+            {
+              "name": "_start",
+              "startAddress": 1077379076,
+              "size": 18,
+              "source": { "path": "main.c", "line": 5, "column": null }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "dram0_0_seg",
+      "startAddress": 1070104576,
+      "size": 345856,
+      "used": 4,
+      "sections": [
+        {
+          "name": ".dram0.bss",
+          "startAddress": 1070104576,
+          "size": 4,
+          "loadAddress": 1070104576,
+          "symbols": [
+            {
+              "name": "counter",
+              "startAddress": 1070104576,
+              "size": 4,
+              "source": { "path": "main.c", "line": 3, "column": null }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}

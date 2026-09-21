@@ -68,10 +68,10 @@ suite('AdapterRegistry', () => {
     ]), /Duplicate adapter/);
   });
 
-  test('the Phase 2 default registry contains GNU Arm and GNU RISC-V', () => {
+  test('the default registry contains the implemented GNU adapters', () => {
     assert.deepStrictEqual(
       createDefaultAdapterRegistry('').toolchainIds,
-      ['gnu-arm-none-eabi', 'gnu-riscv-none-elf']
+      ['gnu-arm-none-eabi', 'gnu-riscv-none-elf', 'gnu-xtensa-elf']
     );
   });
 });

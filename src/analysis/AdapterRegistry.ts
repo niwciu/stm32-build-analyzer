@@ -10,10 +10,15 @@ import {
   GnuRiscVAdapter,
   GnuRiscVAdapterDependencies,
 } from '../toolchains/gnu-riscv/GnuRiscVAdapter';
+import {
+  GnuXtensaAdapter,
+  GnuXtensaAdapterDependencies,
+} from '../toolchains/gnu-xtensa/GnuXtensaAdapter';
 
 export interface DefaultAdapterRegistryDependencies {
   readonly gnuArm?: GnuArmAdapterDependencies;
   readonly gnuRiscV?: GnuRiscVAdapterDependencies;
+  readonly gnuXtensa?: GnuXtensaAdapterDependencies;
 }
 
 export class AdapterRegistry {
@@ -51,5 +56,6 @@ export function createDefaultAdapterRegistry(
   return new AdapterRegistry([
     new GnuArmAdapter(toolchainPath, debug, dependencies.gnuArm),
     new GnuRiscVAdapter(toolchainPath, debug, dependencies.gnuRiscV),
+    new GnuXtensaAdapter(toolchainPath, debug, dependencies.gnuXtensa),
   ]);
 }

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "gnu-xtensa-real-minimal-esp32",
+  "toolchain": "gnu-xtensa-elf",
+  "kind": "analysis",
+  "origin": {
+    "type": "real",
+    "documentation": [
+      "https://github.com/espressif/esp-idf/blob/master/tools/tools.json",
+      "https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/performance/size.html",
+      "https://sourceware.org/binutils/docs/binutils/objdump.html",
+      "https://sourceware.org/binutils/docs/binutils/nm.html"
+    ],
+    "notes": "Freestanding ESP32 CPU-configuration fixture generated with Espressif's unified GNU Xtensa toolchain. It links no ESP-IDF or runtime libraries.",
+    "compilerVersion": "xtensa-esp-elf GCC 16.1.0 and GNU Binutils 2.46 (crosstool-NG esp-16.1.0_20260609)",
+    "targetArchitecture": "ESP32 Xtensa LX6, ELF32 little-endian",
+    "buildFlags": [
+      "gcc -mdynconfig=$TOOLCHAIN_ROOT/lib/xtensa_esp32.so -Os -g -ffreestanding -fno-builtin -ffunction-sections -fdata-sections -fno-pie -fdebug-prefix-map=$PWD=.",
+      "gcc -mdynconfig=$TOOLCHAIN_ROOT/lib/xtensa_esp32.so -nostdlib -no-pie -Wl,-T,linker.ld,-Map,firmware.map"
+    ],
+    "sourceLicense": "MIT",
+    "artifactLicense": "MIT; generated solely from the included source and linker script with no runtime libraries",
+    "provenance": "Generated locally from Espressif's official xtensa-esp-elf 16.1.0_20260609 Linux AMD64 archive, SHA-256 f708752ebb35cab21f184b2574114ed1187619db0edb8a4ba913c06ca2fa675e.",
+    "generationCommand": "xtensa-esp-elf-gcc -mdynconfig=$TOOLCHAIN_ROOT/lib/xtensa_esp32.so -Os -g -ffreestanding -fno-builtin -ffunction-sections -fdata-sections -fno-pie -fdebug-prefix-map=$PWD=. -c -o firmware.o main.c && xtensa-esp-elf-gcc -mdynconfig=$TOOLCHAIN_ROOT/lib/xtensa_esp32.so -nostdlib -no-pie -Wl,-T,linker.ld,-Map,firmware.map -o firmware.elf firmware.o && xtensa-esp-elf-objdump -h firmware.elf > objdump-sections.txt && xtensa-esp-elf-nm -C -S -n -l --defined-only firmware.elf > nm-symbols.txt"
+  },
+  "inputs": {
+    "source": "main.c",
+    "linkerScript": "linker.ld",
+    "object": "firmware.o",
+    "map": "firmware.map",
+    "executable": "firmware.elf",
+    "objdumpStdout": "objdump-sections.txt",
+    "nmStdout": "nm-symbols.txt"
+  },
+  "expected": "expected-analysis.json",
+  "ignored": []
+}
