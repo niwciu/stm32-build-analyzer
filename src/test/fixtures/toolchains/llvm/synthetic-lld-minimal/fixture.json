@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "llvm-lld-synthetic-minimal",
+  "toolchain": "llvm",
+  "kind": "analysis",
+  "origin": {
+    "type": "synthetic",
+    "documentation": [
+      "https://lld.llvm.org/",
+      "https://llvm.org/docs/CommandGuide/llvm-objdump.html",
+      "https://llvm.org/docs/CommandGuide/llvm-nm.html"
+    ],
+    "notes": "Hand-authored native LLD MAP, materialized linker script, llvm-objdump, and llvm-nm excerpts. It covers decimal MEMORY literals, size suffixes, load images, and source locations without claiming compatibility with computed linker expressions."
+  },
+  "inputs": {
+    "linkerScript": "linker.ld",
+    "map": "firmware.map",
+    "objdumpStdout": "objdump-sections.txt",
+    "nmStdout": "nm-symbols.txt"
+  },
+  "expected": "expected-analysis.json",
+  "ignored": []
+}

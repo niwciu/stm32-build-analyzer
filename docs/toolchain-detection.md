@@ -4,7 +4,8 @@ Phase 1 detection is evidence-based and read-only. Detectors inspect MAP text,
 the fixed ELF header prefix, and artifact names; they never execute a build
 artifact. The registry recognizes GNU Arm Embedded, GNU RISC-V, GNU Xtensa,
 LLVM LLD, Arm/Keil armlink, and IAR ILINK. GNU Arm, GNU RISC-V, and the verified
-Espressif GNU Xtensa variants have analysis adapters.
+Espressif GNU Xtensa variants and verified native LLD outputs have analysis
+adapters.
 
 ## Support and result states
 
@@ -13,7 +14,7 @@ Espressif GNU Xtensa variants have analysis adapters.
 | GNU Arm Embedded (`arm-none-eabi`) | Supported; validates GNU Arm tools and analyzes memory, sections, and symbols. |
 | GNU RISC-V Embedded | Supported; validates GNU RISC-V tools and analyzes memory, sections, and symbols. |
 | GNU Xtensa Embedded | Supported for the verified Espressif ESP32, ESP32-S2, and ESP32-S3 variants described below. |
-| LLVM/Clang | Recognized; returns `unsupported` without invoking GNU Arm tools. |
+| LLVM/Clang | Supported for native LLD ELF/MAP output with materialized literal `MEMORY` declarations. |
 | Keil/Arm Compiler | Recognized; returns `unsupported` without invoking GNU Arm tools. |
 | IAR Embedded Workbench for Arm | Recognized; returns `unsupported` without invoking GNU Arm tools. |
 
@@ -49,10 +50,11 @@ evidence for future UI diagnostics.
 
 - Detection reads ELF class, byte order, and machine metadata only. It does not
   yet parse ELF producer comments or target-specific attributes.
-- Most fixtures are minimal, synthetic excerpts derived from GNU Binutils, LLVM
-  LLD, Arm linker, and IAR linker documentation. GNU RISC-V additionally has a
-  real, freestanding RV32IMAC/ILP32 fixture generated with GNU Binutils 2.42.
-  Fixture manifests record provenance and case-specific limitations.
+- Synthetic fixtures are minimal excerpts derived from GNU Binutils, LLVM LLD,
+  Arm linker, and IAR linker documentation. GNU RISC-V, the verified Espressif
+  GNU Xtensa targets, and LLVM additionally have real freestanding fixtures.
+  Fixture manifests record generator versions, provenance, and case-specific
+  limitations.
 - GNU RISC-V tool discovery supports the `riscv64-unknown-elf-`,
   `riscv32-unknown-elf-`, `riscv64-none-elf-`, `riscv32-none-elf-`, and
   `riscv-none-elf-` prefixes. The configured toolchain directory takes
@@ -67,6 +69,13 @@ evidence for future UI diagnostics.
   proprietary MAP layouts remain explicitly unsupported. Full compatibility
   is not claimed for every ESP-IDF configuration; configurations that produce
   materially different MAP or ELF output need a recorded fixture first.
+- LLVM analysis uses `llvm-objdump` and `llvm-nm`. Native LLD MAP files provide
+  section placement but not region capacity, so analysis also requires a
+  materialized linker script with numeric `MEMORY` origins and lengths. The
+  provider searches for one unambiguous script from the build output directory
+  through the workspace root. Computed expressions and GNU-style MAP output
+  from Clang builds are not yet supported. See
+  [LLVM adapter design](llvm-adapter-design.md).
 - A generic GNU linker MAP without architecture evidence from either the MAP or
   ELF header is intentionally unknown. Mixed strong markers are intentionally
   ambiguous.

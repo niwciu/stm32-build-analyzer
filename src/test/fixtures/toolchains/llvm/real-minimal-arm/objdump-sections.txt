@@ -1,0 +1,15 @@
+
+firmware.elf:	file format elf32-littlearm
+
+Sections:
+Idx Name            Size     VMA      LMA      Type
+  0                 00000000 00000000 00000000
+  1 .text           0000000c 08000000 08000000 TEXT
+  2 .data           00000004 20000000 0800000c DATA
+  3 .ARM.attributes 00000025 00000000 00000000
+  4 .debug_line     00000045 00000000 00000000 DEBUG
+  5 .debug_line_str 0000007d 00000000 00000000 DEBUG
+  6 .comment        0000001a 00000000 00000000
+  7 .symtab         00000050 00000000 00000000
+  8 .shstrtab       0000005c 00000000 00000000
+  9 .strtab         0000001a 00000000 00000000

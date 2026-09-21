@@ -2,18 +2,18 @@ import * as assert from 'assert';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import type { ToolchainAdapter } from '../../analysis/contracts';
+import type {
+  KnownToolchainId,
+  ToolchainAdapter,
+} from '../../analysis/contracts';
 import { ANALYSIS_DIAGNOSTIC_CODES } from '../../analysis/diagnostics';
 import type { ToolResolver } from '../../process/ToolResolver';
 import type { ToolRunner, ToolRunResult } from '../../process/ToolRunner';
-import {
-  GnuToolchainId,
-  ToolExecutionError,
-} from '../../toolchains/gnu/GnuBinutilsAdapter';
+import { ToolExecutionError } from '../../toolchains/gnu/GnuBinutilsAdapter';
 
 export interface GnuAdapterContractOptions {
   readonly name: string;
-  readonly toolchainId: GnuToolchainId;
+  readonly toolchainId: KnownToolchainId;
   readonly displayName: string;
   readonly targetArchitecture: string;
   readonly objdumpTool: string;

@@ -1,0 +1,2 @@
+08000000 00000020 T main	src/main.c:7
+20000000 00000010 D state	src/main.c:3

@@ -14,11 +14,16 @@ import {
   GnuXtensaAdapter,
   GnuXtensaAdapterDependencies,
 } from '../toolchains/gnu-xtensa/GnuXtensaAdapter';
+import {
+  LlvmAdapter,
+  LlvmAdapterDependencies,
+} from '../toolchains/llvm/LlvmAdapter';
 
 export interface DefaultAdapterRegistryDependencies {
   readonly gnuArm?: GnuArmAdapterDependencies;
   readonly gnuRiscV?: GnuRiscVAdapterDependencies;
   readonly gnuXtensa?: GnuXtensaAdapterDependencies;
+  readonly llvm?: LlvmAdapterDependencies;
 }
 
 export class AdapterRegistry {
@@ -57,5 +62,6 @@ export function createDefaultAdapterRegistry(
     new GnuArmAdapter(toolchainPath, debug, dependencies.gnuArm),
     new GnuRiscVAdapter(toolchainPath, debug, dependencies.gnuRiscV),
     new GnuXtensaAdapter(toolchainPath, debug, dependencies.gnuXtensa),
+    new LlvmAdapter(toolchainPath, debug, dependencies.llvm),
   ]);
 }

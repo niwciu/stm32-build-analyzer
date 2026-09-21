@@ -68,10 +68,10 @@ suite('AdapterRegistry', () => {
     ]), /Duplicate adapter/);
   });
 
-  test('the default registry contains the implemented GNU adapters', () => {
+  test('the default registry contains all implemented adapters', () => {
     assert.deepStrictEqual(
       createDefaultAdapterRegistry('').toolchainIds,
-      ['gnu-arm-none-eabi', 'gnu-riscv-none-elf', 'gnu-xtensa-elf']
+      ['gnu-arm-none-eabi', 'gnu-riscv-none-elf', 'gnu-xtensa-elf', 'llvm']
     );
   });
 });

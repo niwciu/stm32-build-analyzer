@@ -1,0 +1,7 @@
+             VMA              LMA     Size Align Out     In      Symbol
+         8000000          8000000       20     4 .text
+         8000000          8000000       20     4         main.o:(.text.main)
+         8000000          8000000       20     1                 main
+        20000000          8000020       10     4 .data
+        20000000          8000020       10     4         main.o:(.data.state)
+        20000000          8000020       10     1                 state

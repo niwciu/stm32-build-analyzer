@@ -14,6 +14,7 @@ import {
 import {
   getToolFilename,
 } from '../process/ToolResolver';
+import type { BuildArtifactSet } from '../artifacts/BuildArtifactSet';
 
 const GNU_ARM_TEST_TOOLS = [
   'arm-none-eabi-objdump',
@@ -80,6 +81,62 @@ suite('Extension', () => {
     } finally {
       provider.dispose();
       subscriptions.forEach(disposable => disposable.dispose());
+    }
+  });
+
+  test('provider supplies and watches the linker script discovered for a build', async () => {
+    const subscriptions: vscode.Disposable[] = [];
+    const context = { subscriptions } as unknown as vscode.ExtensionContext;
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    assert.ok(workspaceRoot, 'Test workspace is not open');
+    const testDirectory = path.join(
+      workspaceRoot,
+      `.linker-script-provider-${process.pid}-${Date.now()}`
+    );
+    const buildDirectory = path.join(testDirectory, 'build');
+    const mapPath = path.join(buildDirectory, 'firmware.map');
+    const elfPath = path.join(buildDirectory, 'firmware.elf');
+    const linkerScriptPath = path.join(buildDirectory, 'firmware.ld');
+    await fs.promises.mkdir(buildDirectory, { recursive: true });
+    await Promise.all([
+      fs.promises.writeFile(mapPath, 'VMA LMA Size Align Out In Symbol\n'),
+      fs.promises.writeFile(elfPath, 'ELF'),
+      fs.promises.writeFile(
+        linkerScriptPath,
+        'MEMORY { FLASH : ORIGIN = 0, LENGTH = 1K }'
+      ),
+    ]);
+
+    let analyzedArtifacts: BuildArtifactSet | undefined;
+    const provider = new BuildAnalyzerProvider(
+      context,
+      () => ({
+        analyze: async artifacts => {
+          analyzedArtifacts = artifacts;
+          return successResult();
+        },
+      })
+    );
+    (provider as any).resolver = {
+      resolve: async () => ({ map: mapPath, elf: elfPath }),
+      resolveToolchainPath: async () => undefined,
+    };
+    (provider as any).renderer = {
+      showAnalysis: () => undefined,
+      showError: () => undefined,
+    };
+
+    try {
+      assert.strictEqual(await provider.refresh(), 'success');
+      assert.deepStrictEqual(analyzedArtifacts?.linkerScriptPaths, [linkerScriptPath]);
+      assert.deepStrictEqual(
+        [...(provider as any).watcher.selectedPaths].sort(),
+        [mapPath, elfPath, linkerScriptPath].sort()
+      );
+    } finally {
+      provider.dispose();
+      subscriptions.forEach(disposable => disposable.dispose());
+      await fs.promises.rm(testDirectory, { recursive: true, force: true });
     }
   });
 

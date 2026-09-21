@@ -1,0 +1,24 @@
+     VMA      LMA     Size Align Out     In      Symbol
+ 8000000  8000000        c     4 .text
+ 8000000  8000000        0     4         firmware.o:(.text)
+ 8000000  8000000        c     4         firmware.o:(.text.start)
+ 8000000  8000000        0     1                 $t.0
+ 8000001  8000001        8     1                 _start
+ 8000008  8000008        0     1                 $d.1
+20000000  800000c        4     1 .data
+20000000  800000c        4     1         firmware.o:(.data.counter)
+20000000  800000c        4     1                 counter
+       0        0       25     1 .ARM.attributes
+       0        0       25     1         firmware.o:(.ARM.attributes)
+       0        0       45     1 .debug_line
+       0        0       45     1         firmware.o:(.debug_line)
+       0        0       7d     1 .debug_line_str
+       0        0       7d     1         <internal>:(.debug_line_str)
+       0        0       1a     1 .comment
+       0        0       1a     1         <internal>:(.comment)
+       0        0       50     4 .symtab
+       0        0       50     4         <internal>:(.symtab)
+       0        0       5c     1 .shstrtab
+       0        0       5c     1         <internal>:(.shstrtab)
+       0        0       1a     1 .strtab
+       0        0       1a     1         <internal>:(.strtab)

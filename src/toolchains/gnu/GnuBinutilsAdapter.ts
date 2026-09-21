@@ -45,11 +45,27 @@ export interface GnuBinutilsAdapterDefinition {
 export interface GnuBinutilsAdapterDependencies {
   readonly toolRunner?: ToolRunner;
   readonly toolResolver?: ToolResolver;
-  readonly mapParser?: GnuLinkerMapParser;
-  readonly binutilsParser?: GnuBinutilsParser;
+  readonly mapParser?: BinutilsRegionParser;
+  readonly binutilsParser?: BinutilsOutputParser;
 }
 
 export type GnuToolchainId = Extract<KnownToolchainId, `gnu-${string}`>;
+
+export interface BinutilsRegionParser {
+  parseFile(
+    mapFile: string,
+    linkerScriptPaths?: readonly string[]
+  ): GnuRegion[];
+}
+
+export interface BinutilsOutputParser {
+  parseSections(stdout: string, regions: GnuRegion[]): void;
+  parseSymbols(
+    stdout: string,
+    regions: GnuRegion[],
+    sourceBaseDirectory: string
+  ): void;
+}
 
 interface AnalysisContext {
   readonly invocations: ToolInvocationProvenance[];
@@ -76,13 +92,13 @@ export class ToolExecutionError extends Error {
 
 /** Shared GNU linker-map and binutils workflow configured by concrete adapters. */
 export abstract class GnuBinutilsAdapter implements ToolchainAdapter {
-  abstract readonly toolchainId: GnuToolchainId;
+  abstract readonly toolchainId: KnownToolchainId;
   protected abstract readonly definition: GnuBinutilsAdapterDefinition;
 
   private readonly toolRunner: ToolRunner;
   private readonly toolResolver: ToolResolver;
-  private readonly mapParser: GnuLinkerMapParser;
-  private readonly binutilsParser: GnuBinutilsParser;
+  private readonly mapParser: BinutilsRegionParser;
+  private readonly binutilsParser: BinutilsOutputParser;
 
   protected constructor(
     private readonly toolchainPath: string,
@@ -180,7 +196,10 @@ export abstract class GnuBinutilsAdapter implements ToolchainAdapter {
       console.log(`${this.logPrefix} Parsing executable: ${executablePath}`);
     }
 
-    const regions: GnuRegion[] = this.mapParser.parseFile(mapPath);
+    const regions: GnuRegion[] = this.mapParser.parseFile(
+      mapPath,
+      artifacts.linkerScriptPaths
+    );
     if (this.debug) {
       console.log(`${this.logPrefix} Regions parsed: ${regions.length}`);
       regions.forEach(region => console.log(

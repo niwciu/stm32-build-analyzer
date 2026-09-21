@@ -66,7 +66,7 @@
         "stm32BuildAnalyzerEnhanced.toolchainPath": {
           "type": "string",
           "default": "",
-          "description": "Path to supported GNU Arm, RISC-V, or Xtensa toolchain binaries (such as arm-none-eabi-objdump, riscv64-unknown-elf-objdump, or xtensa-esp-elf-objdump). Supports absolute paths, workspace-relative paths, and variables: ${userHome}, ${workspaceFolder}, ${workspaceFolder:Name}, ${env:VAR}. If not set, tools are resolved from PATH."
+          "description": "Path to supported GNU or LLVM object-tool binaries (such as arm-none-eabi-objdump, riscv64-unknown-elf-objdump, xtensa-esp-elf-objdump, or llvm-objdump). Supports absolute paths, workspace-relative paths, and variables: ${userHome}, ${workspaceFolder}, ${workspaceFolder:Name}, ${env:VAR}. If not set, tools are resolved from PATH."
         },
         "stm32BuildAnalyzerEnhanced.debug": {
           "type": "boolean",

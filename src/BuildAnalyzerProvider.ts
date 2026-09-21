@@ -5,6 +5,7 @@ import {
 } from './analysis/AnalysisOrchestrator';
 import type { BuildAnalysisResult } from './analysis/contracts';
 import type { BuildArtifactSet } from './artifacts/BuildArtifactSet';
+import { discoverLinkerScriptPaths } from './artifacts/LinkerScriptDiscovery';
 import { FileWatcherService } from './services/FileWatcherService';
 import { BuildFolderResolver, BuildPaths } from './services/BuildFolderResolver';
 import { toAnalysisViewModel } from './presentation/analysisViewModel';
@@ -38,6 +39,7 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
   private activeRefresh?: AbortController;
   private refreshGeneration = 0;
   private preferredBuildPaths?: Pick<BuildPaths, 'map' | 'elf'>;
+  private linkerScriptPaths: readonly string[] = [];
   private readonly configurationDisposable: vscode.Disposable;
   private readonly workspaceTrustDisposable: vscode.Disposable;
   private readonly workspaceFoldersDisposable: vscode.Disposable;
@@ -156,7 +158,6 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
       }
       this.paths = paths;
       this.preferredBuildPaths = undefined;
-      this.watcher.watchFiles([paths.map, paths.elf]);
 
       if (!paths.map || !paths.elf) {
         throw new Error('Missing required build paths.');
@@ -170,6 +171,17 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
         throw new Error('No workspace open to resolve relative paths');
       }
 
+      const linkerScriptPaths = await discoverLinkerScriptPaths(
+        paths.map,
+        paths.elf,
+        root
+      );
+      if (controller.signal.aborted || refreshGeneration !== this.refreshGeneration) {
+        return 'superseded';
+      }
+      this.linkerScriptPaths = linkerScriptPaths;
+      this.watcher.watchFiles([paths.map, paths.elf, ...linkerScriptPaths]);
+
       const rel = path.relative(root, paths.map);
       const buildFolder = path.dirname(rel);
       const analysisService = this.analysisServiceFactory(
@@ -179,7 +191,7 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
       const result = await analysisService.analyze({
         mapPath: paths.map,
         executablePath: paths.elf,
-        linkerScriptPaths: [],
+        linkerScriptPaths,
         workspaceFolder: root,
       }, controller.signal);
       if (
@@ -253,11 +265,17 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
   public async fullRefresh() {
     if (this.debug) {console.log('[STM32 Provider] Full refresh requested.');}
     const previousPaths = this.paths;
+    const previousLinkerScriptPaths = this.linkerScriptPaths;
     this.invalidatePaths();
     const outcome = await this.refresh();
     if (outcome === 'cancelled' && previousPaths && !this.paths) {
       this.paths = previousPaths;
-      this.watcher.watchFiles([previousPaths.map, previousPaths.elf]);
+      this.linkerScriptPaths = previousLinkerScriptPaths;
+      this.watcher.watchFiles([
+        previousPaths.map,
+        previousPaths.elf,
+        ...previousLinkerScriptPaths,
+      ]);
     }
   }
 
@@ -283,6 +301,7 @@ export class BuildAnalyzerProvider implements vscode.WebviewViewProvider {
   private invalidatePaths(preferredPaths?: Pick<BuildPaths, 'map' | 'elf'>): void {
     this.pathConfigurationGeneration++;
     this.paths = undefined;
+    this.linkerScriptPaths = [];
     this.preferredBuildPaths = preferredPaths
       ? { map: preferredPaths.map, elf: preferredPaths.elf }
       : undefined;

@@ -56,10 +56,9 @@ tool that prevents all analysis.
 
 The orchestrator validates that both MAP and executable artifacts are readable,
 then runs detection, and only then looks up an adapter. The default adapter
-registry contains `gnu-arm-none-eabi`, `gnu-riscv-none-elf`, and
-`gnu-xtensa-elf`. Recognized LLVM, Keil/Arm Compiler, and IAR Arm builds
-therefore return `unsupported` without validating or invoking GNU tools for a
-different target.
+registry contains `gnu-arm-none-eabi`, `gnu-riscv-none-elf`, `gnu-xtensa-elf`,
+and `llvm`. Recognized Keil/Arm Compiler and IAR Arm builds therefore return
+`unsupported` without validating or invoking tools for a different target.
 
 Unknown and conflicting evidence return `unknown` and `ambiguous` unchanged.
 An unsupported diagnostic names the detected family, explains that its adapter
@@ -89,3 +88,8 @@ identity, architecture metadata, and executable names. `GnuArmAdapter`,
 `GnuRiscVAdapter`, and `GnuXtensaAdapter` remain separate concrete adapters that
 supply target-specific identity and executable names. All three are registered
 by default.
+
+LLVM reuses the bounded execution and provenance workflow while injecting its
+own native LLD region parser and `llvm-objdump` section parser. The region-parser
+interface receives selected linker scripts because native LLD MAP output does
+not contain region capacities. See [LLVM adapter design](llvm-adapter-design.md).
