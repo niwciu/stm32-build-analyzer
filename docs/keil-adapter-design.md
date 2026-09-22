@@ -20,8 +20,8 @@ and sizes.
 - Arm Compiler 6.21's explicit `Exec Addr`/`Load Addr` layout is covered by a
   documented synthetic fixture and remains experimental pending a
   redistributable real fixture.
-- Arm Compiler 4, Arm Compiler 7 or later, incomplete reports without execution
-  regions, and non-Arm Keil linker formats are rejected.
+- Other Arm Compiler versions, incomplete reports without execution regions,
+  and non-Arm Keil linker formats are rejected until separately verified.
 
 The real compact fixture deliberately omits the RAM execution-region heading.
 Rows outside a declared region are ignored with a partial-analysis warning;

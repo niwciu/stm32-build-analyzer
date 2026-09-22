@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "iar-ilink950-synthetic-map",
+  "toolchain": "iar-arm",
+  "kind": "analysis",
+  "origin": {
+    "type": "synthetic",
+    "documentation": [
+      "https://updates.iar.com/SuppDB/Public/UPDINFO/011854/arm/doc/EWARM_DevelopmentGuide.ENU.pdf",
+      "https://docs.iar.com/ewarm/10.1x/en/iar-c-c---development/linking-using-ilink/the-linking-process-in-detail.html"
+    ],
+    "notes": "Hand-authored ILINK 9.50.1 excerpt covering numeric placement ranges, initialized and zero data, and entry symbols. Version 9 remains experimental until a redistributable real fixture is added."
+  },
+  "inputs": { "map": "firmware.map" },
+  "expected": "expected-analysis.json",
+  "ignored": []
+}

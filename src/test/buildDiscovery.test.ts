@@ -51,6 +51,22 @@ suite('build output discovery', () => {
     assert.strictEqual(pairs[0].folder, output);
   });
 
+  for (const extension of ['axf', 'out']) {
+    test(`finds a matching .${extension} executable`, async () => {
+      const build = path.join(root, extension);
+      await fs.promises.mkdir(build);
+      await Promise.all([
+        fs.promises.writeFile(path.join(build, 'firmware.map'), 'map'),
+        fs.promises.writeFile(path.join(build, `firmware.${extension}`), 'ELF'),
+      ]);
+
+      const pairs = await discoverBuildPairs(root);
+
+      assert.strictEqual(pairs.length, 1);
+      assert.strictEqual(pairs[0].elf, path.join(build, `firmware.${extension}`));
+    });
+  }
+
   test('ignores unrelated MAP and ELF files', async () => {
     await fs.promises.writeFile(path.join(root, 'application.map'), 'map');
     await fs.promises.writeFile(path.join(root, 'bootloader.elf'), 'elf');

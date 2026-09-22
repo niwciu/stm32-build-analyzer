@@ -1,0 +1,25 @@
+{
+  "regions": [
+    {
+      "name": "ROM",
+      "startAddress": 134217728,
+      "size": 256,
+      "used": 20,
+      "sections": [
+        { "name": ".text", "startAddress": 134217728, "size": 16, "loadAddress": null, "symbols": [{ "name": "main", "startAddress": 134217728, "size": 16 }] },
+        { "name": ".rodata", "startAddress": 134217744, "size": 4, "loadAddress": null, "symbols": [] }
+      ]
+    },
+    {
+      "name": "RAM",
+      "startAddress": 536870912,
+      "size": 128,
+      "used": 12,
+      "sections": [
+        { "name": ".data", "startAddress": 536870912, "size": 4, "loadAddress": null, "symbols": [{ "name": "counter", "startAddress": 536870912, "size": 4 }] },
+        { "name": ".bss", "startAddress": 536870916, "size": 8, "loadAddress": null, "symbols": [] }
+      ]
+    }
+  ],
+  "warningCount": 1
+}

@@ -1,0 +1,26 @@
+{
+  "regions": [
+    {
+      "name": "P1",
+      "startAddress": 110784,
+      "size": 151360,
+      "used": 214,
+      "sections": [
+        { "name": ".text", "startAddress": 116563, "size": 54, "loadAddress": null, "symbols": [] },
+        { "name": ".text", "startAddress": 118783, "size": 152, "loadAddress": null, "symbols": [] },
+        { "name": ".text", "startAddress": 116600, "size": 8, "loadAddress": null, "symbols": [] }
+      ]
+    },
+    {
+      "name": "P2",
+      "startAddress": 536882936,
+      "size": 20744,
+      "used": 432,
+      "sections": [
+        { "name": ".data", "startAddress": 536883112, "size": 24, "loadAddress": null, "symbols": [] },
+        { "name": ".bss", "startAddress": 536883112, "size": 408, "loadAddress": null, "symbols": [] }
+      ]
+    }
+  ],
+  "warningCount": 1
+}

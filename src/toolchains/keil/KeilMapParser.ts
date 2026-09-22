@@ -43,11 +43,11 @@ export class KeilMapParser {
   parseFile(mapPath: string): ParsedMapAnalysis {
     const content = readMapText('keil-armclang', mapPath);
     const version = parseVersion(content);
-    if (!version || !/^5\.|^6\./.test(version)) {
+    if (version !== '5.06' && version !== '6.21') {
       throw mapFormatError(
         'keil-armclang',
         mapPath,
-        'The MAP file is not a supported Arm Compiler 5/6 armlink report.'
+        'The MAP file is not a supported Arm Compiler 5.06 or 6.21 armlink report.'
       );
     }
     if (!/^\s*Memory Map of the image\s*$/mi.test(content)) {

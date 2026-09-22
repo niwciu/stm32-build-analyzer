@@ -41,6 +41,33 @@ suite('build output pairing', () => {
     );
   });
 
+  test('pairs Keil AXF and IAR OUT executables with MAP files', () => {
+    assert.deepStrictEqual(
+      pairBuildOutputNames([
+        'keil.map',
+        'keil.axf',
+        'iar.MAP',
+        'IAR.OUT',
+      ]),
+      [
+        { map: 'iar.MAP', elf: 'IAR.OUT', stem: 'iar' },
+        { map: 'keil.map', elf: 'keil.axf', stem: 'keil' },
+      ]
+    );
+  });
+
+  test('prefers ELF when several executable formats share a basename', () => {
+    assert.deepStrictEqual(
+      pairBuildOutputNames([
+        'firmware.map',
+        'firmware.out',
+        'firmware.axf',
+        'firmware.elf',
+      ]),
+      [{ map: 'firmware.map', elf: 'firmware.elf', stem: 'firmware' }]
+    );
+  });
+
   test('orders release and debug pairs deterministically', () => {
     assert.deepStrictEqual(
       pairBuildOutputNames([

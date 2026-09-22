@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "iar-ilink780-real-mbed-map",
+  "toolchain": "iar-arm",
+  "kind": "analysis",
+  "origin": {
+    "type": "real",
+    "documentation": [
+      "https://updates.iar.com/SuppDB/Public/UPDINFO/005405/arm/doc/EWARM_DevelopmentGuide.ENU.pdf",
+      "https://github.com/ARMmbed/mbed-os/blob/d723bf9e55415433e108124ee6d36337feddf1b8/tools/test/memap/iar.map"
+    ],
+    "notes": "Compact IAR ILINK 7.80.1.28 MAP fixture from Mbed OS, with trailing whitespace and the final newline normalized. Absolute placement capacity and initialized-data load addresses are deliberately reported as partial.",
+    "compilerVersion": "IAR ILINK 7.80.1.28/LNX for ARM",
+    "targetArchitecture": "Arm ELF/DWARF",
+    "buildFlags": ["--map=/common/path/project.map"],
+    "sourceLicense": "Apache-2.0",
+    "artifactLicense": "Apache-2.0",
+    "provenance": "Copied from ARMmbed/mbed-os commit d723bf9e55415433e108124ee6d36337feddf1b8, tools/test/memap/iar.map.",
+    "generationCommand": "curl -L https://raw.githubusercontent.com/ARMmbed/mbed-os/d723bf9e55415433e108124ee6d36337feddf1b8/tools/test/memap/iar.map | sed 's/[[:space:]]*$//' > firmware.map; printf '\\n' >> firmware.map"
+  },
+  "inputs": { "map": "firmware.map" },
+  "expected": "expected-analysis.json",
+  "ignored": []
+}

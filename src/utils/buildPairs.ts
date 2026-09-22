@@ -11,7 +11,9 @@ export interface BuildOutputPaths {
   elf: string;
 }
 
-function outputStem(fileName: string, extension: '.map' | '.elf'): string | undefined {
+const EXECUTABLE_EXTENSIONS = ['.elf', '.axf', '.out'] as const;
+
+function outputStem(fileName: string, extension: string): string | undefined {
   if (!fileName.toLowerCase().endsWith(extension)) {
     return undefined;
   }
@@ -20,7 +22,7 @@ function outputStem(fileName: string, extension: '.map' | '.elf'): string | unde
 
 export function pairBuildOutputNames(fileNames: readonly string[]): BuildOutputNamePair[] {
   const maps = new Map<string, { name: string; stem: string }>();
-  const elfs = new Map<string, string>();
+  const executables = new Map<string, { name: string; priority: number }>();
 
   [...fileNames].sort((a, b) => a.localeCompare(b)).forEach(fileName => {
     const mapStem = outputStem(fileName, '.map');
@@ -29,16 +31,26 @@ export function pairBuildOutputNames(fileNames: readonly string[]): BuildOutputN
       return;
     }
 
-    const elfStem = outputStem(fileName, '.elf');
-    if (elfStem !== undefined) {
-      elfs.set(elfStem.toLowerCase(), fileName);
+    for (const [priority, extension] of EXECUTABLE_EXTENSIONS.entries()) {
+      const executableStem = outputStem(fileName, extension);
+      if (executableStem === undefined) {
+        continue;
+      }
+      const normalizedStem = executableStem.toLowerCase();
+      const previous = executables.get(normalizedStem);
+      if (!previous || priority < previous.priority) {
+        executables.set(normalizedStem, { name: fileName, priority });
+      }
+      break;
     }
   });
 
   return [...maps.entries()]
     .flatMap(([normalizedStem, map]) => {
-      const elf = elfs.get(normalizedStem);
-      return elf ? [{ map: map.name, elf, stem: map.stem }] : [];
+      const executable = executables.get(normalizedStem)?.name;
+      return executable
+        ? [{ map: map.name, elf: executable, stem: map.stem }]
+        : [];
     })
     .sort((a, b) => {
       const priority = (stem: string): number => {

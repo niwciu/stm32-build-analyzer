@@ -1,0 +1,31 @@
+IAR ELF Linker for Arm V9.50.1
+ilinkarm --map firmware.map
+
+                              PLACEMENT SUMMARY
+                              =================
+
+"ROM": place in [from 0x08000000 to 0x080000ff] { readonly };
+"RAM": place in [from 0x20000000 to 0x2000007f] { readwrite };
+initialize by copy { readwrite };
+
+  Section               Kind        Address    Size  Object
+  -------               ----        -------    ----  ------
+"ROM":                                        0x14
+  .text                 ro code  0x08000000    0x10  app.o [1]
+  .rodata                 const  0x08000010     0x4  app.o [1]
+
+"RAM":                                         0xc
+  .data                  inited  0x20000000     0x4  app.o [1]
+  .bss                     zero  0x20000004     0x8  app.o [1]
+
+*******************************************************************************
+*** MODULE SUMMARY
+***
+
+*******************************************************************************
+*** ENTRY LIST
+***
+
+Entry                               Address      Size  Type      Object
+main                             0x08000000      0x10  Code      app.o
+counter                          0x20000000       0x4  Data      app.o

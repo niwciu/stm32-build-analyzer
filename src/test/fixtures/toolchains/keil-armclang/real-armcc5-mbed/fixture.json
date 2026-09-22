@@ -9,14 +9,14 @@
       "https://www.keil.com/support/man/docs/armlink/default.htm",
       "https://github.com/ARMmbed/mbed-os/blob/d723bf9e55415433e108124ee6d36337feddf1b8/tools/test/memap/arm.map"
     ],
-    "notes": "Unmodified compact Arm Compiler 5.06 update 5 armlink MAP fixture from Mbed OS. Its omitted RAM execution-region header is intentionally reported as partial instead of inferred.",
+    "notes": "Compact Arm Compiler 5.06 update 5 armlink MAP fixture from Mbed OS, with trailing whitespace normalized. Its omitted RAM execution-region header is intentionally reported as partial instead of inferred.",
     "compilerVersion": "ARM Compiler 5.06 update 5 (build 528)",
     "targetArchitecture": "Arm embedded ELF",
     "buildFlags": [],
     "sourceLicense": "Apache-2.0",
     "artifactLicense": "Apache-2.0",
     "provenance": "Copied from ARMmbed/mbed-os commit d723bf9e55415433e108124ee6d36337feddf1b8, tools/test/memap/arm.map.",
-    "generationCommand": "curl -L https://raw.githubusercontent.com/ARMmbed/mbed-os/d723bf9e55415433e108124ee6d36337feddf1b8/tools/test/memap/arm.map -o firmware.map"
+    "generationCommand": "curl -L https://raw.githubusercontent.com/ARMmbed/mbed-os/d723bf9e55415433e108124ee6d36337feddf1b8/tools/test/memap/arm.map | sed 's/[[:space:]]*$//' > firmware.map"
   },
   "inputs": { "map": "firmware.map" },
   "expected": "expected-analysis.json",

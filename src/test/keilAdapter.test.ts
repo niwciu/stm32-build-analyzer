@@ -57,17 +57,17 @@ suite('KeilAdapter', () => {
     });
   });
 
-  test('rejects unverified armlink major versions', () => {
+  test('rejects unverified armlink versions', () => {
     const mapPath = path.join(temporaryDirectory, 'future.map');
     fs.writeFileSync(mapPath, [
-      'ARM Linker, 7.0',
+      'ARM Linker, 5.07',
       'Memory Map of the image',
       'Execution Region ROM (Base: 0x0, Size: 0x1, Max: 0x10)',
     ].join('\n'));
 
     assert.throws(
       () => new KeilMapParser().parseFile(mapPath),
-      /not a supported Arm Compiler 5\/6/
+      /not a supported Arm Compiler 5\.06 or 6\.21/
     );
   });
 

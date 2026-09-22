@@ -3,9 +3,8 @@
 Phase 1 detection is evidence-based and read-only. Detectors inspect MAP text,
 the fixed ELF header prefix, and artifact names; they never execute a build
 artifact. The registry recognizes GNU Arm Embedded, GNU RISC-V, GNU Xtensa,
-LLVM LLD, Arm/Keil armlink, and IAR ILINK. GNU Arm, GNU RISC-V, and the verified
-Espressif GNU Xtensa variants and verified native LLD outputs have analysis
-adapters.
+LLVM LLD, Arm/Keil armlink, and IAR ILINK. Every family has an analysis adapter
+for the exact verified variants and formats listed below.
 
 ## Support and result states
 
@@ -16,7 +15,7 @@ adapters.
 | GNU Xtensa Embedded | Supported for the verified Espressif ESP32, ESP32-S2, and ESP32-S3 variants described below. |
 | LLVM/Clang | Supported for native LLD ELF/MAP output with materialized literal `MEMORY` declarations. |
 | Keil/Arm Compiler | Arm Compiler 5.06 update 5 MAP analysis is supported; the documented Arm Compiler 6.21 layout is experimental. |
-| IAR Embedded Workbench for Arm | Recognized; returns `unsupported` without invoking GNU Arm tools. |
+| IAR Embedded Workbench for Arm | ILINK 7.80.1.28 runtime MAP analysis is supported; ILINK 9.50.1 is experimental. |
 
 `unknown` means no detector reached the selection threshold. `ambiguous` means
 the leading candidates are within the configured ambiguity window. Missing or
@@ -53,8 +52,9 @@ evidence for future UI diagnostics.
 - Synthetic fixtures are minimal excerpts derived from GNU Binutils, LLVM LLD,
   Arm linker, and IAR linker documentation. GNU RISC-V, the verified Espressif
   GNU Xtensa targets, and LLVM additionally have real freestanding fixtures.
-  Fixture manifests record generator versions, provenance, and case-specific
-  limitations.
+  Keil and IAR have real, openly licensed MAP fixtures plus version-specific
+  synthetic cases. Fixture manifests record generator versions, provenance,
+  and case-specific limitations.
 - GNU RISC-V tool discovery supports the `riscv64-unknown-elf-`,
   `riscv32-unknown-elf-`, `riscv64-none-elf-`, `riscv32-none-elf-`, and
   `riscv-none-elf-` prefixes. The configured toolchain directory takes
@@ -81,6 +81,11 @@ evidence for future UI diagnostics.
   Arm Compiler 6.21 currently has documented synthetic coverage only. Missing
   execution-region declarations produce partial results rather than inferred
   capacities. See [Keil adapter design](keil-adapter-design.md).
+- IAR analysis parses numeric ILINK placement ranges without invoking `.out`
+  files or proprietary tools. ILINK 7.80.1.28 has real-fixture coverage;
+  ILINK 9.50.1 currently has synthetic coverage. Initialized RAM data is mapped
+  at runtime, but missing ROM load addresses make that analysis partial. See
+  [IAR adapter design](iar-adapter-design.md).
 - A generic GNU linker MAP without architecture evidence from either the MAP or
   ELF header is intentionally unknown. Mixed strong markers are intentionally
   ambiguous.

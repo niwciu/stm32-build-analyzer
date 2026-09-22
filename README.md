@@ -32,7 +32,7 @@ This fork removes that dependency, adds broader file handling, and enhances the 
 - Visual panel with color-coded usage (RAM, Flash)
 - Sorting by symbol name/address/size within each section
 - Search filter for regions/sections/symbols with optional case sensitivity
-- GNU Arm, GNU RISC-V, verified Espressif GNU Xtensa, native LLD/LLVM, and verified armlink MAP integration
+- GNU Arm, GNU RISC-V, verified Espressif GNU Xtensa, native LLD/LLVM, verified armlink MAP, and verified IAR ILINK MAP integration
 - Compatible with any build system
 - Build multiple folders auto detection
 - Option to point manualy to map and elf object (even wihout .elf .map extension)
@@ -93,12 +93,12 @@ This fork removes that dependency, adds broader file handling, and enhances the 
 
 ## ⚙️ Configuration
 
-The extension auto-detects `.map` + `.elf` files in common build folders. If your build outputs use different names or the ELF has no extension, configure a manual pair so the analyzer can still select the correct files.
+The extension auto-detects `.map` files paired by basename with `.elf`, Keil `.axf`, or IAR `.out` executables in common build folders. If your build outputs use different names or the executable has no extension, configure a manual pair so the analyzer can still select the correct files.
 
 ### How auto-detection works
 
 1. If either `mapFilePath` or `elfFilePath` is configured, both settings must point to readable files. A valid explicit pair is used directly and skips scanning; an incomplete or inaccessible pair produces a clear configuration error.
-2. When neither explicit path is configured, the extension asynchronously scans every root in a multi-root workspace for `.map` and `.elf` files with the same basename and treats each matching pair as a build output. Directory symlinks and common dependency/tooling folders are skipped.
+2. When neither explicit path is configured, the extension asynchronously scans every root in a multi-root workspace for `.map` and `.elf`/`.axf`/`.out` files with the same basename and treats each matching pair as a build output. Directory symlinks and common dependency/tooling folders are skipped.
 3. Manual pairs whose output files have not been built yet are skipped. Available manual and automatically discovered pairs remain selectable.
 4. If multiple available pairs are found, you will be prompted to pick the build output. Configure a manual pair when the MAP and ELF names differ.
 
@@ -115,7 +115,7 @@ Unset environment variables and unknown named workspace folders are reported exp
 | Setting | Type | Default | Description |
 | --- | --- | --- | --- |
 | `stm32BuildAnalyzerEnhanced.mapFilePath` | string | `""` | Absolute or workspace-relative path to the `.map` file. Supports `${userHome}`, `${workspaceFolder}`, `${workspaceFolder:Name}`, and `${env:VAR}`. |
-| `stm32BuildAnalyzerEnhanced.elfFilePath` | string | `""` | Absolute or workspace-relative path to the `.elf` file. Supports `${userHome}`, `${workspaceFolder}`, `${workspaceFolder:Name}`, and `${env:VAR}`. |
+| `stm32BuildAnalyzerEnhanced.elfFilePath` | string | `""` | Absolute or workspace-relative path to an `.elf`, `.axf`, or `.out` executable artifact. The legacy setting name is retained for compatibility. Supports `${userHome}`, `${workspaceFolder}`, `${workspaceFolder:Name}`, and `${env:VAR}`. |
 | `stm32BuildAnalyzerEnhanced.toolchainPath` | string | `""` | Absolute or workspace-relative path to supported GNU or LLVM object-tool binaries. Supports `${userHome}`, `${workspaceFolder}`, `${workspaceFolder:Name}`, and `${env:VAR}`. |
 | `stm32BuildAnalyzerEnhanced.manualBuildPairs` | array | `[]` | List of manual map/elf pairs for builds with non-matching names or locations. Unbuilt pairs are skipped. Path fields support the same variables as the individual path settings. |
 | `stm32BuildAnalyzerEnhanced.debug` | boolean | `false` | Enable verbose logging for debugging purposes. |

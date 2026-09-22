@@ -376,6 +376,10 @@ suite('Extension', () => {
     const subscriptions: vscode.Disposable[] = [];
     const context = { subscriptions } as unknown as vscode.ExtensionContext;
     let analysisCalls = 0;
+    let markFirstAnalysisStarted: (() => void) | undefined;
+    const firstAnalysisStarted = new Promise<void>(resolve => {
+      markFirstAnalysisStarted = resolve;
+    });
     let shownData = 0;
     let shownError = 0;
     const provider = new BuildAnalyzerProvider(
@@ -387,6 +391,7 @@ suite('Extension', () => {
         ) => {
           analysisCalls++;
           if (analysisCalls === 1) {
+            markFirstAnalysisStarted?.();
             await new Promise<void>((_resolve, reject) => {
               signal?.addEventListener(
                 'abort',
@@ -415,7 +420,7 @@ suite('Extension', () => {
 
     try {
       const first = provider.refresh();
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await firstAnalysisStarted;
       const second = provider.refresh();
       const outcomes = await Promise.all([first, second]);
 

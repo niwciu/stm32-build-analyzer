@@ -22,6 +22,10 @@ import {
   KeilAdapter,
   KeilAdapterDependencies,
 } from '../toolchains/keil/KeilAdapter';
+import {
+  IarAdapter,
+  IarAdapterDependencies,
+} from '../toolchains/iar/IarAdapter';
 
 export interface DefaultAdapterRegistryDependencies {
   readonly gnuArm?: GnuArmAdapterDependencies;
@@ -29,6 +33,7 @@ export interface DefaultAdapterRegistryDependencies {
   readonly gnuXtensa?: GnuXtensaAdapterDependencies;
   readonly llvm?: LlvmAdapterDependencies;
   readonly keil?: KeilAdapterDependencies;
+  readonly iar?: IarAdapterDependencies;
 }
 
 export class AdapterRegistry {
@@ -69,5 +74,6 @@ export function createDefaultAdapterRegistry(
     new GnuXtensaAdapter(toolchainPath, debug, dependencies.gnuXtensa),
     new LlvmAdapter(toolchainPath, debug, dependencies.llvm),
     new KeilAdapter(dependencies.keil),
+    new IarAdapter(dependencies.iar),
   ]);
 }

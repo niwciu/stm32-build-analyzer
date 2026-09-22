@@ -61,7 +61,7 @@
         "stm32BuildAnalyzerEnhanced.elfFilePath": {
           "type": "string",
           "default": "",
-          "description": "Path to the .elf file (overrides automatic search). Supports absolute paths, workspace-relative paths, and variables: ${userHome}, ${workspaceFolder}, ${workspaceFolder:Name}, ${env:VAR}."
+          "description": "Path to the executable artifact, such as .elf, .axf, or .out (overrides automatic search). Supports absolute paths, workspace-relative paths, and variables: ${userHome}, ${workspaceFolder}, ${workspaceFolder:Name}, ${env:VAR}."
         },
         "stm32BuildAnalyzerEnhanced.toolchainPath": {
           "type": "string",
@@ -99,7 +99,7 @@
               },
               "elf": {
                 "type": "string",
-                "description": "ELF file path (absolute or relative to the build folder)."
+                "description": "Executable artifact path (absolute or relative to the build folder)."
               }
             }
           }

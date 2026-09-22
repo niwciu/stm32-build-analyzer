@@ -57,8 +57,8 @@ tool that prevents all analysis.
 The orchestrator validates that both MAP and executable artifacts are readable,
 then runs detection, and only then looks up an adapter. The default adapter
 registry contains `gnu-arm-none-eabi`, `gnu-riscv-none-elf`, `gnu-xtensa-elf`,
-and `llvm`. Recognized Keil/Arm Compiler and IAR Arm builds therefore return
-`unsupported` without validating or invoking tools for a different target.
+`llvm`, `keil-armclang`, and `iar-arm`. Every detected supported family is
+routed only to its exact adapter; no adapter invokes tools for another target.
 
 Unknown and conflicting evidence return `unknown` and `ambiguous` unchanged.
 An unsupported diagnostic names the detected family, explains that its adapter
@@ -98,3 +98,8 @@ Keil/Arm Compiler analysis uses a MAP-only adapter because verified armlink
 reports already contain execution-region capacities, section placement, and an
 optional symbol table. It invokes no proprietary executable. See
 [Keil adapter design](keil-adapter-design.md).
+
+IAR analysis also uses the MAP-only workflow. Numeric ILINK placement ranges
+provide capacity while placement and entry tables provide sections and symbols.
+Unavailable initialized-data load addresses are surfaced as partial analysis.
+See [IAR adapter design](iar-adapter-design.md).

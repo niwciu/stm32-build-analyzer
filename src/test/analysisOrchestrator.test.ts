@@ -75,6 +75,7 @@ suite('AdapterRegistry', () => {
         'gnu-arm-none-eabi',
         'gnu-riscv-none-elf',
         'gnu-xtensa-elf',
+        'iar-arm',
         'keil-armclang',
         'llvm',
       ]

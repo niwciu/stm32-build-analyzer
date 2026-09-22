@@ -22,6 +22,8 @@ export class FileWatcherService {
     this.discoveryWatchers = [
       vscode.workspace.createFileSystemWatcher('**/*.[mM][aA][pP]'),
       vscode.workspace.createFileSystemWatcher('**/*.[eE][lL][fF]'),
+      vscode.workspace.createFileSystemWatcher('**/*.[aA][xX][fF]'),
+      vscode.workspace.createFileSystemWatcher('**/*.[oO][uU][tT]'),
     ];
     this.discoveryWatchers.forEach(watcher =>
       this.registerWatcher(watcher, () => true, this.discoveryDisposables)
