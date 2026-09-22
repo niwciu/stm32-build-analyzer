@@ -1,4 +1,5 @@
 export * from './AdapterRegistry';
+export * from './adapterApi';
 export * from './AnalysisOrchestrator';
 export * from './contracts';
 export * from './DetectionRegistry';

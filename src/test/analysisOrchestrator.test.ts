@@ -4,8 +4,14 @@ import * as os from 'os';
 import * as path from 'path';
 import {
   AdapterRegistry,
+  createDefaultAdapterContributions,
   createDefaultAdapterRegistry,
 } from '../analysis/AdapterRegistry';
+import {
+  defineToolchainAdapterV1,
+  TOOLCHAIN_ADAPTER_API_VERSION,
+  ToolchainAdapterContribution,
+} from '../analysis/adapterApi';
 import {
   AnalysisOrchestrator,
   getToolchainDisplayName,
@@ -47,6 +53,28 @@ const acceptingValidator: BuildArtifactValidator = {
 };
 
 suite('AdapterRegistry', () => {
+  test('accepts version 1 adapter contributions', () => {
+    const adapter = fakeAdapter('llvm');
+    const contribution = defineToolchainAdapterV1(adapter);
+    const registry = AdapterRegistry.fromContributions([contribution]);
+
+    assert.strictEqual(contribution.apiVersion, TOOLCHAIN_ADAPTER_API_VERSION);
+    assert.strictEqual(Object.isFrozen(contribution), true);
+    assert.strictEqual(registry.get('llvm'), adapter);
+  });
+
+  test('rejects an unsupported adapter contribution version', () => {
+    const incompatible = {
+      apiVersion: 2,
+      adapter: fakeAdapter('llvm'),
+    } as unknown as ToolchainAdapterContribution;
+
+    assert.throws(
+      () => AdapterRegistry.fromContributions([incompatible]),
+      /Unsupported toolchain adapter API version: 2/
+    );
+  });
+
   test('indexes adapters deterministically', () => {
     const registry = new AdapterRegistry([
       fakeAdapter('llvm'),
@@ -80,6 +108,24 @@ suite('AdapterRegistry', () => {
         'llvm',
       ]
     );
+  });
+
+  test('every built-in adapter conforms to the version 1 contribution API', () => {
+    const contributions = createDefaultAdapterContributions('');
+
+    assert.strictEqual(contributions.length, 6);
+    for (const contribution of contributions) {
+      assert.strictEqual(
+        contribution.apiVersion,
+        TOOLCHAIN_ADAPTER_API_VERSION
+      );
+      assert.strictEqual(typeof contribution.adapter.toolchainId, 'string');
+      assert.strictEqual(
+        typeof contribution.adapter.validateEnvironment,
+        'function'
+      );
+      assert.strictEqual(typeof contribution.adapter.analyze, 'function');
+    }
   });
 });
 

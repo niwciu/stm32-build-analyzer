@@ -3,6 +3,11 @@ import type {
   ToolchainAdapter,
 } from './contracts';
 import {
+  assertSupportedAdapterContribution,
+  defineToolchainAdapterV1,
+  ToolchainAdapterContribution,
+} from './adapterApi';
+import {
   GnuArmAdapter,
   GnuArmAdapterDependencies,
 } from '../toolchains/gnu-arm/GnuArmAdapter';
@@ -48,6 +53,15 @@ export class AdapterRegistry {
     }
   }
 
+  static fromContributions(
+    contributions: readonly ToolchainAdapterContribution[]
+  ): AdapterRegistry {
+    for (const contribution of contributions) {
+      assertSupportedAdapterContribution(contribution);
+    }
+    return new AdapterRegistry(contributions.map(({ adapter }) => adapter));
+  }
+
   get(toolchainId: KnownToolchainId): ToolchainAdapter | undefined {
     return this.adapters.get(toolchainId);
   }
@@ -68,12 +82,30 @@ export function createDefaultAdapterRegistry(
   debug: boolean = false,
   dependencies: DefaultAdapterRegistryDependencies = {}
 ): AdapterRegistry {
-  return new AdapterRegistry([
-    new GnuArmAdapter(toolchainPath, debug, dependencies.gnuArm),
-    new GnuRiscVAdapter(toolchainPath, debug, dependencies.gnuRiscV),
-    new GnuXtensaAdapter(toolchainPath, debug, dependencies.gnuXtensa),
-    new LlvmAdapter(toolchainPath, debug, dependencies.llvm),
-    new KeilAdapter(dependencies.keil),
-    new IarAdapter(dependencies.iar),
-  ]);
+  return AdapterRegistry.fromContributions(
+    createDefaultAdapterContributions(toolchainPath, debug, dependencies)
+  );
+}
+
+export function createDefaultAdapterContributions(
+  toolchainPath: string,
+  debug: boolean = false,
+  dependencies: DefaultAdapterRegistryDependencies = {}
+): readonly ToolchainAdapterContribution[] {
+  return [
+    defineToolchainAdapterV1(
+      new GnuArmAdapter(toolchainPath, debug, dependencies.gnuArm)
+    ),
+    defineToolchainAdapterV1(
+      new GnuRiscVAdapter(toolchainPath, debug, dependencies.gnuRiscV)
+    ),
+    defineToolchainAdapterV1(
+      new GnuXtensaAdapter(toolchainPath, debug, dependencies.gnuXtensa)
+    ),
+    defineToolchainAdapterV1(
+      new LlvmAdapter(toolchainPath, debug, dependencies.llvm)
+    ),
+    defineToolchainAdapterV1(new KeilAdapter(dependencies.keil)),
+    defineToolchainAdapterV1(new IarAdapter(dependencies.iar)),
+  ];
 }

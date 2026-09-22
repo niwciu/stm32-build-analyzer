@@ -4,6 +4,18 @@ Toolchain support is added in two deliberate stages: recognition by a detector,
 then analysis by an adapter. Registering a detector must not implicitly route
 its artifacts through an existing adapter.
 
+The built-in adapter boundary is versioned by
+`TOOLCHAIN_ADAPTER_API_VERSION` in `src/analysis/adapterApi.ts`. Version 1 is
+the compatibility target for adapters maintained in this repository. Define a
+completed adapter with `defineToolchainAdapterV1` and register the resulting
+contribution through `AdapterRegistry.fromContributions`. A version change is
+required for an incompatible contract or semantic change.
+
+This is not a public runtime plugin API. The extension's `activate` function
+does not expose registration, and third-party extensions cannot add adapters at
+runtime. See [Adapter API v1 and trust model](adapter-api-v1.md) for the review
+decision, compatibility rules, and security requirements.
+
 ## 1. Define the identity and detection evidence
 
 1. Add the stable ID to `ToolchainId` in `src/analysis/contracts.ts` and add its
@@ -36,7 +48,8 @@ Implement `ToolchainAdapter` with these responsibilities:
 
 Inject file inspection, tool resolution, and process execution so tests do not
 depend on a locally installed vendor toolchain. Add the adapter to
-`createDefaultAdapterRegistry` only when its contract and fixture tests pass.
+`createDefaultAdapterRegistry` as a version 1 contribution only when its
+contract and fixture tests pass.
 The adapter ID must exactly match its detector ID.
 
 For GNU/binutils families, extend `GnuBinutilsAdapter` instead of duplicating

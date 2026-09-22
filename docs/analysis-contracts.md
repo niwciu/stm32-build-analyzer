@@ -5,6 +5,10 @@ discovery, toolchain detection, adapters, orchestration, and presentation. They
 now drive the provider's analysis path; the presentation mapper retains the
 existing webview's region, section, symbol, and source-link model.
 
+Built-in adapters target the versioned API v1 contribution boundary. Runtime
+third-party registration is intentionally not exposed; the rationale and trust
+requirements are documented in [Adapter API v1 and trust model](adapter-api-v1.md).
+
 ## Artifact and detection semantics
 
 `BuildArtifactSet` permits absent paths so an incomplete selection can produce
