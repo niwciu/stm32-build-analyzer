@@ -1,4 +1,41 @@
 # Changelog
+## [1.2.0] – 2026-09-22 (Pre-release)
+
+### Added
+- Automatically detect supported toolchains from MAP content, ELF metadata,
+  configured tools, and other confidence-weighted evidence without executing
+  firmware artifacts.
+- Analyze GNU RISC-V ELF/MAP builds, including common 32-bit and 64-bit
+  bare-metal tool prefixes.
+- Analyze Espressif GNU Xtensa builds for ESP32, ESP32-S2, and ESP32-S3 using
+  the unified and verified legacy tool prefixes.
+- Analyze native LLVM LLD MAP/ELF builds with `llvm-objdump`, `llvm-nm`, and a
+  materialized linker script containing literal `MEMORY` declarations.
+- Analyze verified Keil/Arm Compiler and IAR Arm MAP reports without requiring
+  or packaging proprietary vendor tools.
+- Add structured supported, partial, unsupported, unknown, ambiguous, invalid,
+  and cancelled analysis outcomes with actionable diagnostics.
+- Add a versioned built-in adapter API, adapter-author documentation, fixture
+  provenance rules, and executable/workspace trust constraints.
+
+### Changed
+- Refactor GNU Arm analysis behind the same detector, adapter, orchestration,
+  and presentation contracts used by every supported toolchain.
+- Discover and watch `.elf`, Keil `.axf`, and IAR `.out` executable artifacts
+  paired with MAP files.
+- Preserve the current extension name, Marketplace identity, command IDs, view
+  IDs, and `stm32BuildAnalyzerEnhanced` settings during pre-release testing.
+- Expand automated coverage to 310 extension-host tests plus production and
+  VSIX packaging checks.
+
+### Known limitations
+- Keil Arm Compiler 6.21 and IAR ILINK 9.50.1 parsing are experimental because
+  their current fixtures are synthetic.
+- LLVM analysis requires an unambiguous materialized linker script with
+  literal region origins and lengths.
+- Public runtime registration of third-party adapters remains deferred; API v1
+  is currently a built-in compatibility boundary.
+
 ## [1.1.9] – 2026-09-11
 
 ### Fixed

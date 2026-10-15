@@ -2,7 +2,12 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![VS Code](https://img.shields.io/badge/VS%20Code-Extension-blue?logo=visualstudiocode)](#)
 
-> Visual memory analyzer for STM32 projects – works with `.map` and `.elf` files, no matter what toolchain or build system you use.
+> Visual memory analyzer for STM32 and other embedded projects using supported
+> MAP and executable formats, independently of the build system.
+
+> **1.2.0 pre-release:** Multi-toolchain analysis is ready for opt-in testing
+> under the existing STM32 Build Analyzer (Enhanced) name. Project identity,
+> command IDs, and settings remain unchanged in this test release.
 
 ![Main UI View](images/2.JPG)
 
@@ -37,6 +42,22 @@ This fork removes that dependency, adds broader file handling, and enhances the 
 - Build multiple folders auto detection
 - Option to point manualy to map and elf object (even wihout .elf .map extension)
 
+### Toolchain support in 1.2.0
+
+| Toolchain | Analyzed inputs | Verification level |
+| --- | --- | --- |
+| GNU Arm Embedded (`arm-none-eabi`) | GNU ld MAP and ELF via `objdump`/`nm` | Existing production behavior retained with regression fixtures |
+| GNU RISC-V Embedded | GNU ld MAP and ELF via matching GNU object tools | Real RV32IMAC artifact generated with GNU Binutils 2.42 |
+| Espressif GNU Xtensa | GNU ld MAP and ELF via `xtensa-esp-elf` or verified legacy prefixes | Real ESP32, ESP32-S2, and ESP32-S3 artifacts generated with GCC 16.1.0/Binutils 2.46 |
+| LLVM/Clang with LLD | Native LLD MAP, ELF, and a materialized linker script; `llvm-objdump`/`llvm-nm` | Real Cortex-M4 artifact generated with LLVM 18.1.3 |
+| Keil/Arm Compiler | Self-contained `armlink` MAP report; no proprietary tool is executed | Arm Compiler 5.06 update 5 verified with a real report; 6.21 format is experimental |
+| IAR Embedded Workbench for Arm | Self-contained ILINK MAP report; no proprietary tool is executed | ILINK 7.80.1.28 verified with a real report; 9.50.1 format is experimental |
+
+Support is format- and version-specific. Unknown, conflicting, or unverified
+artifacts are reported explicitly instead of being routed through a guessed
+adapter. Experimental entries need additional real-world reports before they
+can be promoted to verified support.
+
 ---
 
 ## 📦 Installation
@@ -68,13 +89,13 @@ This fork removes that dependency, adds broader file handling, and enhances the 
    ```
 3. Build the .vsix package using vsce:
    ```bash
-   npm run vsix
+   npm run vsix:pre-release
    ```
-4. This will generate a file like: `stm32-build-analyzer-enhanced-1.1.9.vsix`
+4. This will generate a file like: `stm32-build-analyzer-enhanced-1.2.0.vsix`
 
 5. Install the extension in VS Code: 
    ```bash
-   code --install-extension stm32-build-analyzer-enhanced-1.1.9.vsix
+   code --install-extension stm32-build-analyzer-enhanced-1.2.0.vsix
    ```
 
 

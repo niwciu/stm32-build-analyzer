@@ -1,8 +1,8 @@
 {
   "name": "stm32-build-analyzer-enhanced",
   "displayName": "STM32 Build Analyzer (Enhanced)",
-  "description": "STM32 Build Analyzer for VSCode - Fork of ATwice291/stm32-build-analyzer with additional features...",
-  "version": "1.1.9",
+  "description": "Visual memory analyzer for supported STM32 and embedded GNU, LLVM, Keil, and IAR build artifacts.",
+  "version": "1.2.0",
   "publisher": "niwciu",
   "license": "MIT",
   "icon": "images/icon2.png",
@@ -136,7 +136,8 @@
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "lint": "eslint src webview",
     "test": "node ./out/test/runTest.js",
-    "vsix": "vsce package --no-dependencies"
+    "vsix": "vsce package --no-dependencies",
+    "vsix:pre-release": "vsce package --no-dependencies --pre-release"
   },
   "overrides": {
     "@humanfs/node": "0.16.8",
